@@ -1,0 +1,60 @@
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+*.backup
+Toolkit/Logs/*
+!Toolkit/Logs/.gitkeep
+
+# GUI Settings and cached data
+Toolkit/Settings/gui-settings.json.backup
+.cache/
+
+# Windows-specific
+Thumbs.db
+.DS_Store
+Desktop.ini
+
+# PowerShell
+*.ps1.bak
+*.psm1.bak
+
+# Test/build artifacts
+dist/
+build/
+obj/
+bin/
+
+# User-specific files
+.vs/
+.vscode/launch.json
+.vscode/settings.json
+
+# Sensitive files
+*.key
+*.pfx
+*.pem
+secrets.json
+
+# Backup folders
+*_BACKUP_*
+backup/
+backups/
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows shortcuts
+*.lnk
+
+# Credential files
+credential*.json
+*.cred
