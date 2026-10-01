@@ -1,0 +1,19 @@
+# Code owners - must review and approve changes
+
+# Global - all files by default
+* @TechieJustin86
+
+# Core modules - critical security/performance components
+Toolkit/Core/ @TechieJustin86
+Toolkit/Core/SecurityManagement.ps1 @TechieJustin86
+Toolkit/Core/ErrorHandling.ps1 @TechieJustin86
+
+# Documentation - keep docs current
+docs/ @TechieJustin86
+README.md @TechieJustin86
+SECURITY.md @TechieJustin86
+CONTRIBUTING.md @TechieJustin86
+
+# License and policies
+LICENSE @TechieJustin86
+CODE_OF_CONDUCT.md @TechieJustin86

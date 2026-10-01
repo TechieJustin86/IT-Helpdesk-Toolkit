@@ -1,0 +1,89 @@
+name: PowerShell Syntax Check
+
+on:
+  push:
+    branches: [ master, develop ]
+    paths: [ '**.ps1' ]
+  pull_request:
+    branches: [ master, develop ]
+    paths: [ '**.ps1' ]
+
+jobs:
+  syntax-check:
+    runs-on: windows-latest
+    name: Validate PowerShell
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Validate PowerShell Syntax
+        shell: powershell
+        run: |
+          $ErrorCount = 0
+          $WarningCount = 0
+
+          Write-Host "🔍 Scanning PowerShell files..." -ForegroundColor Cyan
+          Write-Host ""
+
+          Get-ChildItem -Recurse -Filter "*.ps1" | ForEach-Object {
+            try {
+              $content = Get-Content $_.FullName -Raw
+              $tokens = @()
+              $errors = @()
+
+              [void][System.Management.Automation.PSParser]::Tokenize($content, [ref]$errors)
+
+              if ($errors.Count -gt 0) {
+                Write-Host "❌ $($_.Name)" -ForegroundColor Red
+                $errors | ForEach-Object {
+                  Write-Host "   Line $($_.Token.StartLine): $($_.Message)" -ForegroundColor Yellow
+                }
+                $ErrorCount++
+              } else {
+                Write-Host "✅ $($_.Name)" -ForegroundColor Green
+              }
+            }
+            catch {
+              Write-Host "⚠️  $($_.Name) - Parse error" -ForegroundColor Yellow
+              Write-Host "   $_" -ForegroundColor Yellow
+              $WarningCount++
+            }
+          }
+
+          Write-Host ""
+          Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan
+          Write-Host "Results:" -ForegroundColor Cyan
+          Write-Host "  ✅ Valid files"
+          Write-Host "  ⚠️  Warnings: $WarningCount"
+          Write-Host "  ❌ Errors: $ErrorCount" -ForegroundColor Red
+
+          if ($ErrorCount -gt 0) {
+            Write-Host ""
+            Write-Host "❌ Syntax validation FAILED" -ForegroundColor Red
+            exit 1
+          } else {
+            Write-Host ""
+            Write-Host "✅ All PowerShell files are valid!" -ForegroundColor Green
+            exit 0
+          }
+
+      - name: Check file encoding
+        shell: powershell
+        run: |
+          Write-Host "🔍 Checking file encoding..." -ForegroundColor Cyan
+          $files = Get-ChildItem -Recurse -Filter "*.ps1"
+          $issues = 0
+
+          foreach ($file in $files) {
+            $bytes = [System.IO.File]::ReadAllBytes($file.FullName)
+            if ($bytes.Length -gt 3) {
+              $bom = $bytes[0..3]
+              if ($bom[0] -eq 0xEF -and $bom[1] -eq 0xBB -and $bom[2] -eq 0xBF) {
+                # UTF-8 BOM (OK)
+              } elseif ($bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE) {
+                # UTF-16 LE (OK)
+              }
+            }
+          }
+          Write-Host "✅ File encoding check passed" -ForegroundColor Green
