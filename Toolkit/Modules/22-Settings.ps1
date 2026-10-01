@@ -59,7 +59,11 @@ Add-Tool -Id 'SET-01' -Category 'Settings & Configuration' -Name 'Toolkit settin
     Write-Info 'Edit settings JSON directly for advanced configuration'
 
     if (Confirm-Action 'Open settings file in default editor?') {
-        & $settingsPath
+        if (Test-Path $settingsPath) {
+            Invoke-Item $settingsPath
+        } else {
+            Write-Warn "Settings file not found at: $settingsPath"
+        }
     }
 }
 
@@ -187,7 +191,7 @@ Add-Tool -Id 'SET-03' -Category 'Settings & Configuration' -Name 'About the tool
 Add-Tool -Id 'SET-04' -Category 'Settings & Configuration' -Name 'Verify toolkit integrity' -Description 'Check all modules load correctly, validate syntax, and test that each category works' -Action {
     Write-Section 'Toolkit Integrity Check'
 
-    $modulesDir = Split-Path -Path $PSCommandPath
+    $modulesDir = if ($PSCommandPath) { Split-Path -Path $PSCommandPath } else { Split-Path -Path $PSScriptRoot }
     $allGood = $true
     $errors = @()
 
