@@ -413,7 +413,10 @@ $Script:SharedStyles
     <Border DockPanel.Dock="Bottom" Background="{DynamicResource StatusBg}" Padding="14,5">
       <Grid>
         <TextBlock x:Name="StatusText" Text="Ready" Foreground="{DynamicResource StatusText}"/>
-        <TextBlock x:Name="ProgressText" HorizontalAlignment="Right" Foreground="{DynamicResource Accent}" FontFamily="Consolas"/>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+          <TextBlock x:Name="ProgressText" Foreground="{DynamicResource Accent}" FontFamily="Consolas" Margin="0,0,20,0"/>
+          <TextBlock Text="Created by TechieJustin86" Foreground="{DynamicResource Faint}" FontSize="11" VerticalAlignment="Center"/>
+        </StackPanel>
       </Grid>
     </Border>
 
