@@ -15,7 +15,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Validate PowerShell Syntax
         shell: powershell
@@ -23,7 +23,7 @@ jobs:
           $ErrorCount = 0
           $WarningCount = 0
 
-          Write-Host "🔍 Scanning PowerShell files..." -ForegroundColor Cyan
+          Write-Host "Scanning PowerShell files..." -ForegroundColor Cyan
           Write-Host ""
 
           Get-ChildItem -Recurse -Filter "*.ps1" | ForEach-Object {
@@ -35,43 +35,43 @@ jobs:
               [void][System.Management.Automation.PSParser]::Tokenize($content, [ref]$errors)
 
               if ($errors.Count -gt 0) {
-                Write-Host "❌ $($_.Name)" -ForegroundColor Red
+                Write-Host "[FAIL] $($_.Name)" -ForegroundColor Red
                 $errors | ForEach-Object {
                   Write-Host "   Line $($_.Token.StartLine): $($_.Message)" -ForegroundColor Yellow
                 }
                 $ErrorCount++
               } else {
-                Write-Host "✅ $($_.Name)" -ForegroundColor Green
+                Write-Host "[OK] $($_.Name)" -ForegroundColor Green
               }
             }
             catch {
-              Write-Host "⚠️  $($_.Name) - Parse error" -ForegroundColor Yellow
+              Write-Host "[WARN] $($_.Name) - Parse error" -ForegroundColor Yellow
               Write-Host "   $_" -ForegroundColor Yellow
               $WarningCount++
             }
           }
 
           Write-Host ""
-          Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan
+          Write-Host "========================================" -ForegroundColor Cyan
           Write-Host "Results:" -ForegroundColor Cyan
-          Write-Host "  ✅ Valid files"
-          Write-Host "  ⚠️  Warnings: $WarningCount"
-          Write-Host "  ❌ Errors: $ErrorCount" -ForegroundColor Red
+          Write-Host "  [OK] Valid files"
+          Write-Host "  [WARN] Warnings: $WarningCount"
+          Write-Host "  [FAIL] Errors: $ErrorCount" -ForegroundColor Red
 
           if ($ErrorCount -gt 0) {
             Write-Host ""
-            Write-Host "❌ Syntax validation FAILED" -ForegroundColor Red
+            Write-Host "[FAIL] Syntax validation FAILED" -ForegroundColor Red
             exit 1
           } else {
             Write-Host ""
-            Write-Host "✅ All PowerShell files are valid!" -ForegroundColor Green
+            Write-Host "[OK] All PowerShell files are valid!" -ForegroundColor Green
             exit 0
           }
 
       - name: Check file encoding
         shell: powershell
         run: |
-          Write-Host "🔍 Checking file encoding..." -ForegroundColor Cyan
+          Write-Host "Checking file encoding..." -ForegroundColor Cyan
           $files = Get-ChildItem -Recurse -Filter "*.ps1"
           $issues = 0
 
@@ -86,4 +86,4 @@ jobs:
               }
             }
           }
-          Write-Host "✅ File encoding check passed" -ForegroundColor Green
+          Write-Host "[OK] File encoding check passed" -ForegroundColor Green
