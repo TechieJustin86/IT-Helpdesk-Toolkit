@@ -193,7 +193,7 @@ Add-Tool -Id 'AD-20' -Category 'Active Directory' -Name 'Find unlinked GPOs' -De
     foreach ($gpo in $gpos) {
         try {
             $links = Get-GPOReport -Guid $gpo.Id -ReportType XML -ErrorAction Stop | Out-String
-            if ($links -notmatch '<Links>.*</Links>') {
+            if ($links -notmatch '<LinksTo>') {
                 $unlinkedGPOs += $gpo
             }
         } catch {
@@ -611,7 +611,9 @@ Add-Tool -Id 'AD-32' -Category 'Active Directory' -Name 'User profile management
             if (-not $username) { return }
             if (-not (Confirm-Action "Delete profile for $username ?")) { return }
             try {
-                Get-CimInstance Win32_UserProfile -Filter "Name like '%$username%'" -ErrorAction Stop | Remove-CimInstance -ErrorAction Stop
+                # Win32_UserProfile has no Name property; match the profile folder name (strip DOMAIN\ and WQL wildcards)
+                $folder = ($username -split '\\')[-1] -replace "['%]", ''
+                Get-CimInstance Win32_UserProfile -Filter "LocalPath LIKE '%\\$folder'" -ErrorAction Stop | Remove-CimInstance -ErrorAction Stop
                 Write-Ok "Profile deleted for $username"
                 Write-Log "User profile deleted: $username"
             } catch { Write-Err "Profile deletion failed: $($_.Exception.Message)" }
@@ -627,7 +629,7 @@ Add-Tool -Id 'AD-32' -Category 'Active Directory' -Name 'User profile management
     }
 }
 
-Add-Tool -Id 'AD-33' -Category 'Active Directory' -Name 'AD Self-Service Plus registry config' -Description 'Configure AD Self-Service Plus registry settings' -Action {
+Add-Tool -Id 'AD-33' -Category 'Active Directory' -Name 'AD Self-Service Plus registry config' -Description 'Configure AD Self-Service Plus registry settings' -Admin -Action {
     Write-Info 'Configuring AD Self-Service Plus registry settings...'
     $regPath = 'HKLM:\Software\Policies\Quest Software\ActiveRoles\SelfService'
 
