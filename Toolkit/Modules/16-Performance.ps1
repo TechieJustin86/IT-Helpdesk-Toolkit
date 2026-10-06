@@ -22,10 +22,10 @@ Add-Tool -Id 'PERF-01' -Category 'Performance & Optimization' -Name 'Performance
 
     # Disk Usage
     Write-Info 'Disk'
-    $disk = Get-Volume -DriveLetter C -ErrorAction SilentlyContinue
+    $disk = Get-Volume -DriveLetter $env:SystemDrive.TrimEnd(':') -ErrorAction SilentlyContinue
     if ($disk) {
         $diskPercent = [math]::Round((($disk.Size - $disk.SizeRemaining) / $disk.Size) * 100, 1)
-        Write-Check -Status $(if ($diskPercent -lt 80) { 'OK' } else { 'WARN' }) -Label 'C: Drive' -Value "$diskPercent% ($(Format-Bytes ($disk.Size - $disk.SizeRemaining))/$(Format-Bytes $disk.Size))"
+        Write-Check -Status $(if ($diskPercent -lt 80) { 'OK' } else { 'WARN' }) -Label "$env:SystemDrive Drive" -Value "$diskPercent% ($(Format-Bytes ($disk.Size - $disk.SizeRemaining))/$(Format-Bytes $disk.Size))"
     }
 
     # Top processes by memory
@@ -56,17 +56,18 @@ Add-Tool -Id 'PERF-02' -Category 'Performance & Optimization' -Name 'Optimize po
         }
         '2' {
             Write-Info 'Optimizing for Desktop (high performance)...'
-            powercfg /setactive 8c5e7fda-e8bf-45a6-a6cc-4b3c9b6c0a11
+            powercfg /setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c
             powercfg /change monitor-timeout-ac 0
             powercfg /change disk-timeout-ac 0
         }
         '3' {
             Write-Info 'Optimizing for Server (max performance)...'
-            powercfg /setactive 8c5e7fda-e8bf-45a6-a6cc-4b3c9b6c0a11
+            powercfg /setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c
             powercfg /change monitor-timeout-ac 0
             powercfg /change disk-timeout-ac 0
             powercfg /change sleep-timeout-ac 0
         }
+        default { Write-Warn 'No device type chosen - power plan not changed.'; return }
     }
 
     Write-Ok 'Power plan optimized'
@@ -158,13 +159,13 @@ Add-Tool -Id 'PERF-06' -Category 'Performance & Optimization' -Name 'Network spe
         @{Name='Amazon'; IP='amazon.com'}
     )
 
-    foreach ($host in $hosts) {
-        $ping = Test-Connection $host.IP -Count 4 -ErrorAction SilentlyContinue
+    foreach ($target in $hosts) {
+        $ping = Test-Connection $target.IP -Count 4 -ErrorAction SilentlyContinue
         if ($ping) {
-            $avg = $ping | Measure-Object ResponseTime -Average | Select-Object -ExpandProperty Average
-            Write-Check -Status OK -Label $host.Name -Value "$('{0:F1}' -f $avg)ms avg"
+            $avg = $ping | ForEach-Object { if ($null -ne $_.Latency) { $_.Latency } else { $_.ResponseTime } } | Measure-Object -Average | Select-Object -ExpandProperty Average
+            Write-Check -Status OK -Label $target.Name -Value "$('{0:F1}' -f $avg)ms avg"
         } else {
-            Write-Check -Status FAIL -Label $host.Name -Value 'No response'
+            Write-Check -Status FAIL -Label $target.Name -Value 'No response'
         }
     }
 
