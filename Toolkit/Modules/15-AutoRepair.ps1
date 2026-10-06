@@ -107,7 +107,7 @@ Add-Tool -Id 'AR-03' -Category 'Auto-Repair' -Name 'Fix network issues' -Descrip
     ipconfig /renew | Out-Host
 
     Write-Info 'Resetting TCP/IP stack...'
-    netsh int ip reset resetlog.txt | Out-Host
+    netsh int ip reset | Out-Host
 
     Write-Info 'Resetting Winsock...'
     netsh winsock reset catalog | Out-Host
@@ -131,7 +131,7 @@ Add-Tool -Id 'AR-04' -Category 'Auto-Repair' -Name 'Fix Windows Update' -Descrip
 
     Write-Ok 'Windows Update reset complete'
     Write-Info 'Checking for updates...'
-    powershell -Command "(New-Object -ComObject Microsoft.Update.AutoUpdate).DetectNow()"
+    (New-Object -ComObject Microsoft.Update.AutoUpdate).DetectNow()
     Write-Ok 'Update check initiated'
 }
 
@@ -143,7 +143,7 @@ Add-Tool -Id 'AR-05' -Category 'Auto-Repair' -Name 'Diagnose & fix common issues
 
     # Check disk space
     Write-Info 'Checking disk space...'
-    $disk = Get-Volume -DriveLetter C -ErrorAction SilentlyContinue
+    $disk = Get-Volume -DriveLetter $env:SystemDrive.TrimEnd(':') -ErrorAction SilentlyContinue
     if ($disk -and ($disk.SizeRemaining / $disk.Size) -lt 0.1) {
         $issues += ‘Low disk space (< 10% free)’
         $fixes += ‘> Run AR-01 (Auto tune-up) to free space’
@@ -175,7 +175,7 @@ Add-Tool -Id 'AR-05' -Category 'Auto-Repair' -Name 'Diagnose & fix common issues
     # Check disk health
     Write-Info ‘Checking disk health...’
     try {
-        $smart = Get-WmiObject -Namespace root\wmi -Class MSStorageDriver_FailurePredictStatus -ErrorAction SilentlyContinue
+        $smart = Get-CimInstance -Namespace root\wmi -ClassName MSStorageDriver_FailurePredictStatus -ErrorAction SilentlyContinue
         if ($smart -and $smart.PredictFailure) {
             $issues += ‘Disk failure predicted - URGENT’
             $fixes += ‘> Back up data immediately, consider replacement’
