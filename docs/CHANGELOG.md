@@ -47,12 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Output buffer rotation to prevent GUI freezing
   - Resource monitoring and limiting
 
-- **Documentation**:
-  - `FEATURES.md` - Feature list and v1.5 enhancements
-  - `IMPLEMENTATION.md` - Implementation details
-  - `QUICK_REFERENCE.md` - Quick reference guide
-  - Enhanced `README.md` with v1.5 information
-  - `ARCHITECTURE.md` - System design documentation
+- **Documentation**: `ARCHITECTURE.md`, `GUIDE.md` (common tasks, configuration, troubleshooting) and this changelog
 
 ### Changed
 - Restructured module loading order for proper dependency management
@@ -150,10 +145,9 @@ This toolkit was created to provide IT professionals with a comprehensive Window
 
 - 📖 **Documentation**: See `README.md` and `docs/` folder
 - 🐛 **Bug Reports**: GitHub Issues
-- 🔒 **Security Reports**: Email jjeschette@gmail.com
-- 💬 **Questions**: GitHub Discussions
+- 🔒 **Security Reports**: See `SECURITY.md`
 - 📝 **Contributing**: See `CONTRIBUTING.md`
 
 ---
 
-**Last Updated**: September 30, 2026
+**Last Updated**: October 6, 2026

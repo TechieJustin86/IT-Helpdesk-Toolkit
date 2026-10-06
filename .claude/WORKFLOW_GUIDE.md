@@ -209,25 +209,15 @@ Includes configurable timeout and CIDR range support."
 
 ```
 D:\Projects\Git_PS_IT_Helpdesk_Toolkit\
+├── Launch-GUI.bat                   # Double-click to start
 ├── Toolkit\
 │   ├── HelpdeskToolkit.ps1          # Console entry point
 │   ├── HelpdeskToolkit-GUI.ps1      # GUI entry point
-│   ├── Launch-GUI.bat               # Double-click to start
-│   ├── Core\                        # Core modules
-│   │   ├── Common.ps1
-│   │   ├── ErrorHandling.ps1
-│   │   └── ... (other core modules)
-│   └── Modules\                     # Feature modules (by category)
-│       ├── 01-SystemInfo.ps1
-│       ├── 03-Network.ps1
-│       ├── 22-Settings.ps1
-│       └── ... (other categories)
-├── docs\                            # Public documentation
-│   ├── ARCHITECTURE.md
-│   ├── FEATURES.md
-│   └── ... (other public docs)
-└── .claude\
-    └── WORKFLOW_GUIDE.md            # This file
+│   ├── Core\                        # Shared helpers, config, error handling
+│   ├── Modules\                     # Feature modules (one per category)
+│   └── Stand alone scripts\         # Independent tools
+├── docs\                            # ARCHITECTURE, GUIDE, CHANGELOG
+└── .claude\WORKFLOW_GUIDE.md        # This file
 ```
 
 ---
@@ -281,7 +271,7 @@ git checkout feature/other-name  # Switch to another branch
 
 ## Version Info
 
-- **Last Updated:** 2026-10-01
+- **Last Updated:** 2026-10-06
 - **Toolkit Version:** 1.5.0
 - **Repository:** https://github.com/TechieJustin86/IT-Helpdesk-Toolkit
 

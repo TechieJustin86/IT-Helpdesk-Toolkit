@@ -27,16 +27,16 @@ Project Root/
 │   ├── Modules/                # Feature modules (loaded after Core)
 │   │   ├── 01-SystemInfo.ps1       # 14 system diagnostic tools
 │   │   ├── 02-Hardware.ps1         # 11 hardware tools
-│   │   ├── 03-Network.ps1          # 27 network tools
-│   │   ├── 04-Maintenance.ps1      # 25 maintenance tools
+│   │   ├── 03-Network.ps1          # 31 network tools
+│   │   ├── 04-Maintenance.ps1      # 34 maintenance tools
 │   │   ├── 05-AppsOffice.ps1       # 13 apps/Office tools
-│   │   ├── 06-Security.ps1         # 17 security tools
+│   │   ├── 06-Security.ps1         # 20 security tools
 │   │   ├── 07-Users.ps1            # 12 user management tools
-│   │   ├── 08-ActiveDirectory.ps1  # 9 AD tools (optional)
+│   │   ├── 08-ActiveDirectory.ps1  # 23 AD tools (optional)
 │   │   ├── 09-Microsoft365.ps1     # 15 M365 tools (optional)
-│   │   ├── 10-Troubleshooting.ps1  # 20 troubleshooting tools
-│   │   ├── 11-Remote.ps1           # 10 remote operation tools
-│   │   ├── 13-Reports.ps1          # 8 reporting tools
+│   │   ├── 10-Troubleshooting.ps1  # 22 troubleshooting tools
+│   │   ├── 11-Remote.ps1           # 12 remote operation tools
+│   │   ├── 13-Reports.ps1          # 10 reporting tools
 │   │   ├── 14-QuickLaunch.ps1      # 24 quick launcher tools
 │   │   ├── 15-AutoRepair.ps1       # 5 auto-repair tools
 │   │   ├── 16-Performance.ps1      # 6 performance tools
@@ -44,25 +44,23 @@ Project Root/
 │   │   ├── 18-Intune.ps1           # 5 Intune tools
 │   │   ├── 19-DailyTools.ps1       # 7 daily tools
 │   │   ├── 20-Analytics.ps1        # 3 analytics tools
-│   │   ├── 21-Developer.ps1        # 11 developer tools
+│   │   ├── 21-Developer.ps1        # 9 developer tools
 │   │   ├── 22-Settings.ps1         # 5 settings tools
-│   │   ├── 23-Recommendations.ps1  # 5 diagnostic tools (NEW)
-│   │   └── 24-Toolkit-Admin.ps1    # 6 admin tools (NEW)
+│   │   ├── 23-Recommendations.ps1  # 5 diagnostic tools
+│   │   └── 24-Toolkit-Admin.ps1    # 6 admin tools
 │   │
 │   ├── Gui/
 │   │   └── GuiHost.ps1         # GUI I/O redirection
 │   │
-│   ├── Settings/               # GUI preferences (portable)
-│   │   └── gui-settings.json   # Theme & favorites
-│   │
-│   └── Logs/                   # Error logs (LOCAL, not Documents)
-│       └── (generated at runtime)
+│   ├── Settings/               # GUI preferences (portable, git-ignored)
+│   ├── Logs/                   # Optional local logs (git-ignored)
+│   └── Stand alone scripts/    # Independent tools (Input-and-Hardware-Diagnostics.ps1)
 │
-└── docs/                       # Documentation
+├── .github/                    # CODEOWNERS, syntax-check workflow
+└── docs/
     ├── ARCHITECTURE.md         # This file
-    ├── FEATURES.md            # Feature list & v1.5 improvements
-    ├── IMPLEMENTATION.md      # Implementation details
-    └── QUICK_REFERENCE.md     # One-page cheat sheet
+    ├── GUIDE.md                # Common tasks, config, logs, troubleshooting
+    └── CHANGELOG.md            # Release history
 ```
 
 ## Module Loading Order
@@ -132,7 +130,7 @@ The toolkit loads modules in this specific order to ensure dependencies are met:
 - Favorite tools list
 - Window size/position
 
-### Error/Output Logs (NEW in v1.5)
+### Local logs
 **Location:** `Toolkit\Logs\` (optional, for local testing)
 - Can be configured to store locally instead of Documents
 
@@ -157,7 +155,7 @@ Add-Tool -Id 'NET-01' `
 - `Category` - Menu category (auto-creates if new)
 - `Name` - Display name
 - `Description` - One-line description
-- `Tags` - Optional tags for filtering (NEW in v1.5)
+- `Tags` - Optional tags for filtering
 - `Admin` - Flag if tool requires administrator
 - `Action` - ScriptBlock containing tool code
 
@@ -210,5 +208,4 @@ Add-Tool -Id 'NET-30' -Category 'Network' -Name 'My Tool' -Tags @('diagnostic') 
 ---
 
 **Version:** 1.5.0  
-**Last Updated:** September 30, 2026  
-**Status:** Production Ready
+**Last Updated:** October 6, 2026
