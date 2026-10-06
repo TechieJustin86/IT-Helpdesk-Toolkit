@@ -17,3 +17,4 @@ If something is found, do NOT commit or push. Report the file and line and ask t
 ## Workflow
 
 - `master` is protected: changes go through a PR. The owner is the only admin, so merges need `--admin` (ask the user first).
+- Claude may merge PRs only when the owner explicitly says to.
