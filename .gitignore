@@ -8,6 +8,7 @@ Toolkit/Logs/*
 
 # GUI Settings and cached data
 Toolkit/Settings/gui-settings.json.backup
+Toolkit/Settings/toolkit-settings.json
 .cache/
 
 # Windows-specific
