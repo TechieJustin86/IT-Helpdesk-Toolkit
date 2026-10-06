@@ -84,7 +84,6 @@ This project adheres to the [Contributor Covenant Code of Conduct](CODE_OF_CONDU
 3. **GUI mode test**:
    ```powershell
    .\Launch-GUI.bat
-   # Double-click Launch-GUI.bat to test in GUI
    ```
 
 4. **Backward compatibility**: Ensure existing tools still work
@@ -111,10 +110,10 @@ issues using #issue-number format.
 ### Documentation
 
 Update relevant docs when making changes:
-- **New tool?** → Update `README.md` tools table
-- **New feature?** → Add to `docs/FEATURES.md`
-- **Breaking change?** → Update `CHANGELOG.md`
-- **Config change?** → Update `docs/IMPLEMENTATION.md`
+- **New tool?** → Update the `README.md` tools table and counts
+- **Any user-visible change?** → Add to `docs/CHANGELOG.md`
+- **Config, logging or troubleshooting change?** → Update `docs/GUIDE.md`
+- **New module or core file?** → Update `docs/ARCHITECTURE.md`
 
 ## Submitting Changes
 
@@ -157,12 +156,7 @@ Use GitHub Issues to report bugs or suggest features:
 
 ⚠️ **Do not create public issues for security vulnerabilities**
 
-Instead, email security concerns to: [maintainer-email]
-
-Include:
-- Description of vulnerability
-- Impact assessment
-- Suggested fix (if any)
+Instead, follow the reporting process in [SECURITY.md](SECURITY.md).
 
 ## Project Structure
 
@@ -171,15 +165,13 @@ Toolkit/
 ├── Core/              # Foundation modules (always loaded first)
 ├── Modules/           # Feature modules (one per category)
 ├── Gui/               # GUI-specific code
-├── Assets/            # Icons, resources
 ├── Settings/          # User preferences (portable)
 └── Logs/              # Error logs (local, for testing)
 
 docs/
-├── FEATURES.md        # Feature documentation
 ├── ARCHITECTURE.md    # System design
-├── IMPLEMENTATION.md  # Implementation details
-└── QUICK_REFERENCE.md # Quick reference guide
+├── GUIDE.md           # Tasks, configuration, troubleshooting
+└── CHANGELOG.md       # Release history
 ```
 
 ## Building Standalone Versions
