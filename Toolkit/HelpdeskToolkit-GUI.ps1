@@ -23,9 +23,10 @@ $Script:Exe  = (Get-Process -Id $PID).Path
 
 # WPF needs a single-threaded apartment
 if ([Threading.Thread]::CurrentThread.GetApartmentState() -ne 'STA') {
-    $argLine = "-NoProfile -ExecutionPolicy Bypass -STA -File `"$PSCommandPath`""
+    # Hidden, or Windows PowerShell 5.1 (which starts in MTA) leaves a console window open behind the GUI
+    $argLine = "-NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File `"$PSCommandPath`""
     if ($NoElevate) { $argLine += ' -NoElevate' }
-    Start-Process -FilePath $Script:Exe -ArgumentList $argLine
+    Start-Process -FilePath $Script:Exe -ArgumentList $argLine -WindowStyle Hidden
     return
 }
 
@@ -37,7 +38,7 @@ function Test-IsAdmin {
 }
 
 function Start-Elevated {
-    $argLine = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$PSCommandPath`" -NoElevate"
+    $argLine = "-NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File `"$PSCommandPath`" -NoElevate"
     try { Start-Process -FilePath $Script:Exe -Verb RunAs -ArgumentList $argLine -ErrorAction Stop; return $true }
     catch { return $false }
 }
@@ -1240,6 +1241,8 @@ $Script:Window.Add_PreviewKeyDown({
     if ($ctrl -and $_.Key -eq 'F') { [void]$Script:Ui.SearchBox.Focus(); $Script:Ui.SearchBox.SelectAll(); $_.Handled = $true }
     elseif ($ctrl -and $_.Key -eq 'B') { Switch-Favorite $Script:Ui.ToolList.SelectedItem; $_.Handled = $true }
     elseif ($ctrl -and $_.Key -eq 'D') { $Script:Ui.ThemeButton.RaiseEvent((New-Object System.Windows.RoutedEventArgs([System.Windows.Controls.Button]::ClickEvent))); $_.Handled = $true }
+    elseif ($ctrl -and $_.Key -eq 'E') { $Script:Ui.FolderButton.RaiseEvent((New-Object System.Windows.RoutedEventArgs([System.Windows.Controls.Button]::ClickEvent))); $_.Handled = $true }
+    elseif ($ctrl -and $_.Key -eq 'L') { $Script:Ui.ClearButton.RaiseEvent((New-Object System.Windows.RoutedEventArgs([System.Windows.Controls.Button]::ClickEvent))); $_.Handled = $true }
     elseif ($_.Key -eq 'F1') { $Script:Ui.HelpButton.RaiseEvent((New-Object System.Windows.RoutedEventArgs([System.Windows.Controls.Button]::ClickEvent))); $_.Handled = $true }
     elseif ($_.Key -eq 'F5') { Start-Tool $Script:Ui.ToolList.SelectedItem; $_.Handled = $true }
 })
