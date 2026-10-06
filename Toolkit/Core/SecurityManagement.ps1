@@ -100,8 +100,8 @@ function Log-AuditEvent {
     )
 
     try {
-        if (-not (Test-Path -LiteralPath $Script:OutDir)) {
-            New-Item -ItemType Directory -Path $Script:OutDir -Force | Out-Null
+        if (-not (Test-Path -LiteralPath $Script:LogDir)) {
+            New-Item -ItemType Directory -Path $Script:LogDir -Force | Out-Null
         }
 
         $entry = @{
@@ -240,7 +240,7 @@ function Show-SecuritySummary {
     Write-Check 'INFO' 'User' $status.User
     if ($status.LastElevation) {
         $age = (Get-Date) - $status.LastElevation
-        Write-Check 'INFO' 'Last Elevation' $age.ToString('hh\:mm\:ss') + ' ago'
+        Write-Check 'INFO' 'Last Elevation' ($age.ToString('hh\:mm\:ss') + ' ago')
     }
 
     $credCount = $Script:CredentialCache.Count
