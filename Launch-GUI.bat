@@ -13,4 +13,4 @@ if %errorlevel% equ 0 exit /b
 
 REM UAC was cancelled - open without admin rights
 :launch
-start "" powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "%~dp0Toolkit\HelpdeskToolkit-GUI.ps1" -NoElevate
+start "" powershell.exe -NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File "%~dp0Toolkit\HelpdeskToolkit-GUI.ps1" -NoElevate

@@ -68,7 +68,7 @@ function Invoke-ToolSafe {
 
         $duration = (Get-Date) - $startTime
         Write-ToolUsage -ToolId $toolId -ToolName $toolName -Category $Tool.Category
-        Write-Log "Tool execution completed: $toolId - $toolName (${duration.TotalSeconds}s)"
+        Write-Log "Tool execution completed: $toolId - $toolName ($([math]::Round($duration.TotalSeconds, 1))s)"
 
         if (-not $NoPause) { Wait-Key }
         return $true
@@ -77,7 +77,7 @@ function Invoke-ToolSafe {
         $duration = (Get-Date) - $startTime
         Write-ErrorLog -ToolId $toolId -ToolName $toolName -ErrorRecord $_
         Write-Err "Tool failed: $_"
-        Write-Err "Execution time: ${duration.TotalSeconds}s"
+        Write-Err "Execution time: $([math]::Round($duration.TotalSeconds, 1))s"
 
         if (-not $NoPause) { Wait-Key }
         return $false

@@ -38,7 +38,7 @@ function Set-Cache {
         [int]$DurationMinutes = 1
     )
 
-    if (-not (Test-ConfigValue -Category 'Performance' -Setting 'EnableCaching')) { return }
+    if (-not (Get-ConfigValue -Category 'Performance' -Setting 'EnableCaching')) { return }
 
     $Script:Cache[$Key] = @{
         Value = $Value
@@ -50,7 +50,7 @@ function Set-Cache {
 function Get-Cache {
     param([Parameter(Mandatory)][string]$Key)
 
-    if (-not (Test-ConfigValue -Category 'Performance' -Setting 'EnableCaching')) { return $null }
+    if (-not (Get-ConfigValue -Category 'Performance' -Setting 'EnableCaching')) { return $null }
 
     $cache = $Script:Cache[$Key]
     if ($null -eq $cache -or $null -eq $cache.Expiration) { return $null }
@@ -74,7 +74,8 @@ function Clear-Cache {
     if ($Key) {
         $Script:Cache[$Key] = @{ Value = $null; Expiration = $null }
     } else {
-        foreach ($k in $Script:Cache.Keys) {
+        # Copy the key list (the table is changed inside the loop) and leave the regex table alone
+        foreach ($k in @($Script:Cache.Keys | Where-Object { $_ -ne 'CompiledRegex' })) {
             $Script:Cache[$k] = @{ Value = $null; Expiration = $null }
         }
     }

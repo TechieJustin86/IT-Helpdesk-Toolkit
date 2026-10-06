@@ -105,10 +105,11 @@ function Test-ToolPrerequisites {
     $deps = Get-ToolDependencies -ToolId $ToolId
     $results = @()
 
-    foreach ($dep in $deps) {
-        $met = Test-DependencyMet -DependencyKey ($Script:Dependencies.Keys | Where-Object { $Script:Dependencies[$_].ToolIds -contains $ToolId })[0]
+    foreach ($key in @($Script:Dependencies.Keys | Where-Object { $Script:Dependencies[$_].ToolIds -contains $ToolId })) {
+        $dep = $Script:Dependencies[$key]
+        $met = Test-DependencyMet -DependencyKey $key
         $results += [pscustomobject]@{
-            Dependency = $dep.Keys[0]
+            Dependency = $key
             Met = $met
             Module = $dep.Module
             InstallNote = $dep.InstallNote

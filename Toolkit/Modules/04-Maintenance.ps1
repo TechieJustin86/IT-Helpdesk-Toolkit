@@ -256,7 +256,7 @@ Add-Tool -Id 'MNT-25' -Category 'Maintenance & Repair' -Name 'One-click safe mai
     Write-Ok ('Maintenance complete - {0} of temporary files removed.' -f (Format-Bytes $total))
 }
 
-Add-Tool -Id 'MNT-17' -Category 'Maintenance & Repair' -Name 'Disk usage analyzer' -Description 'Find large folders consuming most disk space' -Action {
+Add-Tool -Id 'MNT-28' -Category 'Maintenance & Repair' -Name 'Disk usage analyzer' -Description 'Find large folders consuming most disk space' -Action {
     Write-Section 'Disk Usage Analysis'
     $driveLetter = Read-Host "Analyze drive [$env:SystemDrive]"
     if (-not $driveLetter) { $driveLetter = $env:SystemDrive }
@@ -301,8 +301,8 @@ Add-Tool -Id 'MNT-17' -Category 'Maintenance & Repair' -Name 'Disk usage analyze
     }
 }
 
-Add-Tool -Id 'MNT-18' -Category 'Maintenance & Repair' -Name 'System restore point' -Admin -Description 'Create a manual System Restore point for backup' -Action {
-    if (-not (Test-Admin)) { Write-Warn 'Administrator privileges required'; return }
+Add-Tool -Id 'MNT-29' -Category 'Maintenance & Repair' -Name 'System restore point' -Admin -Description 'Create a manual System Restore point for backup' -Action {
+    if (-not (Test-IsAdmin)) { Write-Warn 'Administrator privileges required'; return }
 
     $name = Read-Host "Restore point name (default: $(Get-Date -Format 'yyyy-MM-dd HH:mm'))"
     if (-not $name) { $name = "Helpdesk Toolkit - $(Get-Date -Format 'yyyy-MM-dd HH:mm')" }
@@ -316,7 +316,7 @@ Add-Tool -Id 'MNT-18' -Category 'Maintenance & Repair' -Name 'System restore poi
     }
 }
 
-Add-Tool -Id 'MNT-20' -Category 'Maintenance' -Name 'Disable Windows Update server' -Description 'Disable the use of a WSUS/Windows Update server on this PC' -Admin -Action {
+Add-Tool -Id 'MNT-30' -Category 'Maintenance & Repair' -Name 'Disable Windows Update server' -Description 'Disable the use of a WSUS/Windows Update server on this PC' -Admin -Action {
     $regPath = 'HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU'
     $regKeyName = 'UseWUServer'
 
@@ -332,7 +332,7 @@ Add-Tool -Id 'MNT-20' -Category 'Maintenance' -Name 'Disable Windows Update serv
     } catch { Write-Err "Configuration failed: $($_.Exception.Message)" }
 }
 
-Add-Tool -Id 'MNT-21' -Category 'Maintenance' -Name 'Enable Windows Update server' -Description 'Enable the use of a WSUS/Windows Update server on this PC' -Admin -Action {
+Add-Tool -Id 'MNT-31' -Category 'Maintenance & Repair' -Name 'Enable Windows Update server' -Description 'Enable the use of a WSUS/Windows Update server on this PC' -Admin -Action {
     $regPath = 'HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU'
     $regKeyName = 'UseWUServer'
 
@@ -348,7 +348,7 @@ Add-Tool -Id 'MNT-21' -Category 'Maintenance' -Name 'Enable Windows Update serve
     } catch { Write-Err "Configuration failed: $($_.Exception.Message)" }
 }
 
-Add-Tool -Id 'MNT-22' -Category 'Maintenance' -Name 'Unblock Windows Store' -Description 'Remove registry-based Windows Store blocking policies' -Admin -Action {
+Add-Tool -Id 'MNT-32' -Category 'Maintenance & Repair' -Name 'Unblock Windows Store' -Description 'Remove registry-based Windows Store blocking policies' -Admin -Action {
     $regPath = 'HKLM:\SOFTWARE\Policies\Microsoft\WindowsStore'
     $regKeys = @('RemoveWindowsStore', 'DisableStoreApps')
 
@@ -369,7 +369,7 @@ Add-Tool -Id 'MNT-22' -Category 'Maintenance' -Name 'Unblock Windows Store' -Des
     } catch { Write-Err "Configuration failed: $($_.Exception.Message)" }
 }
 
-Add-Tool -Id 'MNT-23' -Category 'Maintenance' -Name 'Remove Appx packages' -Description 'Interactively remove installed Appx packages (Windows Store apps)' -Action {
+Add-Tool -Id 'MNT-33' -Category 'Maintenance & Repair' -Name 'Remove Appx packages' -Description 'Interactively remove installed Appx packages (Windows Store apps)' -Action {
     Write-Info 'Retrieving installed Appx packages...'
     try {
         $apps = @(Get-AppxPackage -ErrorAction Stop | Sort-Object Name)
@@ -377,23 +377,21 @@ Add-Tool -Id 'MNT-23' -Category 'Maintenance' -Name 'Remove Appx packages' -Desc
 
     if (-not $apps.Count) { Write-Ok 'No Appx packages installed.'; return }
 
-    Write-Info "Found $($apps.Count) Appx package(s). Choose one to remove (or Escape to cancel):"
-    Write-Host ""
-
-    $selection = $apps | Out-GridView -Title "Select Appx Package to Remove" -OutputMode Single
+    Write-Info "Found $($apps.Count) Appx package(s)."
+    $selection = Select-FromList $apps { '{0,-55} {1}' -f $_.Name, $_.Version } 'Appx package to remove'
     if (-not $selection) { Write-Info 'Cancelled.'; return }
 
     Write-Warn "Removing: $($selection.Name)"
     if (-not (Confirm-Action "Proceed with removing '$($selection.Name)'?")) { return }
 
     try {
-        Remove-AppxPackage -Package $selection -ErrorAction Stop
+        Remove-AppxPackage -Package $selection.PackageFullName -ErrorAction Stop
         Write-Ok "Package removed: $($selection.Name)"
         Write-Log "Appx package removed: $($selection.Name)"
     } catch { Write-Err "Removal failed: $($_.Exception.Message)" }
 }
 
-Add-Tool -Id 'MNT-24' -Category 'Maintenance' -Name 'Fix Outlook password prompt' -Description 'Disable credentials caching to resolve Outlook password prompt disappearing issues' -Admin -Action {
+Add-Tool -Id 'MNT-34' -Category 'Maintenance & Repair' -Name 'Fix Outlook password prompt' -Description 'Disable credentials caching to resolve Outlook password prompt disappearing issues' -Admin -Action {
     Write-Info 'Configuring Outlook password behavior...'
 
     $registryPaths = @(
@@ -498,7 +496,7 @@ Add-Tool -Id 'MNT-26' -Category 'Maintenance & Repair' -Name 'Remove Bloatware' 
 
     foreach ($app in $toRemove) {
         try {
-            Remove-AppxPackage -Package $app.PackageName -ErrorAction Stop
+            Get-AppxPackage -Name $app.PackageName -ErrorAction Stop | Remove-AppxPackage -ErrorAction Stop
             Write-Ok "Removed: $($app.DisplayName)"
             $removed++
         } catch {

@@ -432,7 +432,7 @@ Add-Tool -Id 'NET-27' -Category 'Network' -Name 'Inspect a local port' -Descript
     }
 }
 
-Add-Tool -Id 'NET-15' -Category 'Network' -Name 'Advanced ping test' -Description 'Ping a host with multiple attempts and latency statistics' -Action {
+Add-Tool -Id 'NET-28' -Category 'Network' -Name 'Advanced ping test' -Description 'Ping a host with multiple attempts and latency statistics' -Action {
     $target = Read-Host "Target host or IP address"
     if (-not $target) { Write-Warn 'No target specified'; return }
 
@@ -440,11 +440,13 @@ Add-Tool -Id 'NET-15' -Category 'Network' -Name 'Advanced ping test' -Descriptio
     Write-Host ''
 
     $results = @()
+    $pinger = New-Object System.Net.NetworkInformation.Ping
     for ($i = 0; $i -lt 4; $i++) {
-        $ping = Test-Connection -ComputerName $target -Count 1 -ErrorAction SilentlyContinue
-        if ($ping) {
-            $results += $ping.ResponseTime
-            Write-Check 'OK' "Reply from $($ping.Address)" "$($ping.ResponseTime)ms"
+        $ping = $null
+        try { $ping = $pinger.Send($target, 1000) } catch { }
+        if ($ping -and $ping.Status -eq 'Success') {
+            $results += $ping.RoundtripTime
+            Write-Check 'OK' "Reply from $($ping.Address)" "$($ping.RoundtripTime)ms"
         } else {
             Write-Warn "No reply (timeout)"
         }
@@ -463,7 +465,7 @@ Add-Tool -Id 'NET-15' -Category 'Network' -Name 'Advanced ping test' -Descriptio
     }
 }
 
-Add-Tool -Id 'NET-16' -Category 'Network' -Name 'Traceroute analysis' -Description 'Trace network path to destination host' -Action {
+Add-Tool -Id 'NET-29' -Category 'Network' -Name 'Traceroute analysis' -Description 'Trace network path to destination host' -Action {
     $target = Read-Host "Target host or IP address"
     if (-not $target) { Write-Warn 'No target specified'; return }
 
@@ -477,7 +479,7 @@ Add-Tool -Id 'NET-16' -Category 'Network' -Name 'Traceroute analysis' -Descripti
     }
 }
 
-Add-Tool -Id 'NET-17' -Category 'Network' -Name 'DNS lookup tools' -Description 'Resolve DNS name to IP, reverse lookup, and query records' -Action {
+Add-Tool -Id 'NET-30' -Category 'Network' -Name 'DNS lookup tools' -Description 'Resolve DNS name to IP, reverse lookup, and query records' -Action {
     Write-Host '  [1] Forward DNS lookup (name to IP)'
     Write-Host '  [2] Reverse DNS lookup (IP to name)'
     Write-Host '  [3] DNS record query (A, MX, NS, SOA)'
@@ -529,7 +531,7 @@ Add-Tool -Id 'NET-17' -Category 'Network' -Name 'DNS lookup tools' -Description 
     }
 }
 
-Add-Tool -Id 'NET-18' -Category 'Network' -Name 'WiFi diagnostics' -Description 'List WiFi networks, connected network info, and signal strength' -Action {
+Add-Tool -Id 'NET-31' -Category 'Network' -Name 'WiFi diagnostics' -Description 'List WiFi networks, connected network info, and signal strength' -Action {
     Write-Section 'WiFi Adapter Status'
     $wifi = @(Get-NetAdapter -Physical -ErrorAction SilentlyContinue | Where-Object { $_.MediaType -eq '802.11' -or $_.InterfaceDescription -like '*Wireless*' })
 
@@ -539,9 +541,10 @@ Add-Tool -Id 'NET-18' -Category 'Network' -Name 'WiFi diagnostics' -Description 
     }
 
     $wifi | ForEach-Object {
-        Write-Check $(if ($_.Status -eq 'Up') { 'OK' } else { 'WARN' }) 'WiFi Adapter' "$($_.Name) - $($_.Status)"
-        if ($_.Status -eq 'Up') {
-            $connected = Get-NetConnectionProfile -ErrorAction SilentlyContinue | Where-Object { $_.InterfaceAlias -eq $_.Name }
+        $adapter = $_
+        Write-Check $(if ($adapter.Status -eq 'Up') { 'OK' } else { 'WARN' }) 'WiFi Adapter' "$($adapter.Name) - $($adapter.Status)"
+        if ($adapter.Status -eq 'Up') {
+            $connected = Get-NetConnectionProfile -ErrorAction SilentlyContinue | Where-Object { $_.InterfaceAlias -eq $adapter.Name }
             if ($connected) {
                 Write-Check 'INFO' 'Connected Network' $connected.Name
                 Write-Check 'INFO' 'Network Type' $connected.NetworkCategory
@@ -552,7 +555,7 @@ Add-Tool -Id 'NET-18' -Category 'Network' -Name 'WiFi diagnostics' -Description 
     Write-Host ''
     Write-Section 'Available WiFi Networks'
 
-    if (Test-Admin) {
+    if (Test-IsAdmin) {
         try {
             $networks = netsh wlan show network | Out-String
             if ($networks -match 'Interface name') {

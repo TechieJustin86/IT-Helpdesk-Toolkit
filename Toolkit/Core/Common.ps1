@@ -25,7 +25,8 @@
 $Script:Version      = '1.5.0'
 # Determine Toolkit directory - Core is one level up from this script
 if ($PSScriptRoot) {
-    $Script:ToolkitDir = Split-Path $PSScriptRoot -Parent
+    # From source this file sits in Core\; in a built single file it sits next to the script
+    $Script:ToolkitDir = if ((Split-Path $PSScriptRoot -Leaf) -eq 'Core') { Split-Path $PSScriptRoot -Parent } else { $PSScriptRoot }
 } elseif ($HdtRoot) {
     # When loaded in GUI background runspace, use HdtRoot passed from GUI
     $Script:ToolkitDir = $HdtRoot

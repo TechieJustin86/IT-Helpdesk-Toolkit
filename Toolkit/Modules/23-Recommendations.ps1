@@ -29,26 +29,26 @@ Add-Tool -Id 'REC-02' -Category 'Recommendations' -Name 'Recommendations for thi
     # Check disk space
     $disks = Get-DiskSpace | Where-Object { $_.'Free %' -lt 20 }
     if ($disks.Count -gt 0) {
-        $checks += "Disk space low on: $($disks.Drive -join ', '). Run NET-22 (Disk Cleanup)"
+        $checks += "Disk space low on: $($disks.Drive -join ', '). Run MNT-14 (Disk Cleanup) or MNT-01"
     }
 
     # Check for stopped auto services
     $stopped = @(Get-StoppedAutoServices)
     if ($stopped.Count -gt 0 -and $stopped.Count -le 3) {
-        $checks += "Auto services not running: $(($stopped.Name -join ', ')). Run TSH-08 (Stopped Services)"
+        $checks += "Auto services not running: $(($stopped.Name -join ', ')). Run TRB-06 (Stopped automatic services)"
     }
 
     # Check pending reboot
     $reboot = @(Get-PendingReboot)
     if ($reboot.Count -gt 0) {
-        $checks += "Restart pending due to: $($reboot -join ', '). Use System Settings or run MNT-18."
+        $checks += "Restart pending due to: $($reboot -join ', '). Restart after saving work (MNT-19 can schedule it)."
     }
 
     # Check updates
     $security = Get-SecurityAudit
     $lastUpdate = $security | Where-Object { $_.Check -eq 'Last update' }
     if ($lastUpdate -and $lastUpdate.Status -eq 'WARN') {
-        $checks += "$($lastUpdate.Result). Run MNT-09 (Check Updates)"
+        $checks += "$($lastUpdate.Result). Run MNT-10 (Check for Windows updates)"
     }
 
     # Check firewall
@@ -66,7 +66,7 @@ Add-Tool -Id 'REC-02' -Category 'Recommendations' -Name 'Recommendations for thi
     # Check SMBv1
     $smb = $security | Where-Object { $_.Check -like '*SMBv1*' }
     if ($smb -and $smb.Status -eq 'WARN') {
-        $checks += "SMBv1 is enabled (security risk). Run SEC-10 (Disable SMBv1)."
+        $checks += "SMBv1 is enabled (security risk). SYS-13 lists it; turn off SMB 1.0 in Windows Features."
     }
 
     # Check temp files

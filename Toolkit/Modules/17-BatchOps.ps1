@@ -11,30 +11,23 @@ Add-Tool -Id 'BATCH-01' -Category 'Batch Operations' -Name 'Bulk restart PCs' -D
     $message = Read-Host '  Message to show users [Empty]'
     if (-not $message) { $message = 'Your computer will restart in ' + $minutes + ' minutes' }
 
-    $computerList = $computers -split ',' | ForEach-Object { $_.Trim() }
+    if ($minutes -notmatch '^\d+$') { $minutes = 5 }
+    $computerList = @($computers -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    if (-not $computerList.Count) { Write-Info 'No computers entered.'; return }
+    $seconds = [int]$minutes * 60
+    $message = $message.Replace('"', "'")
 
+    if (-not (Confirm-Action "Restart $($computerList.Count) computer(s) in $minutes minute(s)?")) { return }
     Write-Info "Scheduling restart on $($computerList.Count) computer(s)..."
     Write-Host ''
 
+    # Win32Shutdown flag 1 is a shutdown (not a restart) and takes no timeout, so use shutdown.exe like RMT-07
     foreach ($computer in $computerList) {
         try {
             Write-Info "Contacting $computer..."
-            $seconds = [int]$minutes * 60
-
-            # WMI method for remote shutdown
-            $params = @{
-                Path = "\\$computer\root\cimv2:Win32_OperatingSystem.Name='Microsoft Windows 10 Pro|C:\\Windows|\\Device\\Harddisk0\\Partition1'"
-                Name = 'Win32ShutdownTracker'
-                Arguments = @{ Flags = 1; Reason = 'Restart'; Timeout = $seconds; Comment = $message }
-                ErrorAction = 'SilentlyContinue'
-            }
-
-            # Try alternative method
-            Invoke-CimMethod -ComputerName $computer -ClassName Win32_OperatingSystem `
-                -MethodName Win32Shutdown -Arguments @{Flags=1;Timeout=$seconds} `
-                -ErrorAction SilentlyContinue
-
-            Write-Ok "$computer - Restart scheduled for $minutes minutes"
+            $code = Invoke-External 'shutdown.exe' "/m \\$computer /r /f /t $seconds /c `"$message`""
+            if ($code -eq 0) { Write-Ok "$computer - Restart scheduled for $minutes minutes" }
+            else { Write-Err "$computer - shutdown.exe returned $code (access denied or PC unreachable?)" }
         } catch {
             Write-Err "$computer - Failed: $_"
         }
@@ -47,31 +40,35 @@ Add-Tool -Id 'BATCH-02' -Category 'Batch Operations' -Name 'Network inventory sc
     $subnet = Read-Host '  Enter subnet (e.g., 192.168.1.0/24 or 192.168.1)'
     $baseIP = $subnet -replace '/.*'
     $octets = $baseIP -split '\.'
+    if ($octets.Count -lt 3) { Write-Err 'Enter a subnet such as 192.168.1.0/24.'; return }
     $base = [string]::Join('.', $octets[0..2])
 
     Write-Info "Scanning $base.0/24 (this may take 30-60 seconds)..."
     $results = @()
 
-    1..254 | ForEach-Object {
-        $ip = "$base.$_"
-        $result = Test-Connection -ComputerName $ip -Count 1 -Quiet -ErrorAction SilentlyContinue -TimeoutSec 1
+    # Test-Connection -TimeoutSec only exists in PowerShell 7; ping all hosts at once with the .NET class (as NET-15 does)
+    $pings = 1..254 | ForEach-Object {
+        $p = New-Object System.Net.NetworkInformation.Ping
+        [pscustomobject]@{ IP = "$base.$_"; Task = $p.SendPingAsync("$base.$_", 1000) }
+    }
+    [void][Threading.Tasks.Task]::WaitAll([Threading.Tasks.Task[]]$pings.Task)
 
-        if ($result) {
-            try {
-                $hostname = [System.Net.Dns]::GetHostByAddress($ip).HostName
-            } catch {
-                $hostname = 'Unknown'
-            }
-
-            $results += [pscustomobject]@{
-                IP = $ip
-                Hostname = $hostname
-                Status = 'Online'
-            }
-
-            Write-Host "  [OK] $ip ($hostname)" -ForegroundColor Green
+    foreach ($ping in @($pings | Where-Object { $_.Task.Result.Status -eq 'Success' })) {
+        $ip = $ping.IP
+        try {
+            $hostname = [System.Net.Dns]::GetHostByAddress($ip).HostName
+        } catch {
+            $hostname = 'Unknown'
         }
-    } -ErrorAction SilentlyContinue
+
+        $results += [pscustomobject]@{
+            IP = $ip
+            Hostname = $hostname
+            Status = 'Online'
+        }
+
+        Write-Host "  [OK] $ip ($hostname)" -ForegroundColor Green
+    }
 
     Write-Host ''
     Write-Info "Found $($results.Count) active computer(s):"

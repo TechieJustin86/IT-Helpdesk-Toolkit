@@ -282,7 +282,7 @@ Add-Tool -Id 'HW-12' -Category 'Hardware & Peripherals' -Name 'Battery reports' 
 
     switch ($choice) {
         '1' {
-            $outPath = "$env:USERPROFILE\Desktop\BatteryReport_$(Get-Date -Format 'yyyyMMdd_HHmmss').html"
+            $outPath = Join-Path ([Environment]::GetFolderPath('Desktop')) "BatteryReport_$(Get-Date -Format 'yyyyMMdd_HHmmss').html"
             Write-Info "Generating 7-day battery report..."
             powercfg /batteryreport /output "$outPath" /duration 7 2>&1 | Out-Null
             if (Test-Path $outPath) {
@@ -291,7 +291,7 @@ Add-Tool -Id 'HW-12' -Category 'Hardware & Peripherals' -Name 'Battery reports' 
             }
         }
         '2' {
-            $outPath = "$env:USERPROFILE\Desktop\BatteryReport_Detailed_$(Get-Date -Format 'yyyyMMdd_HHmmss').html"
+            $outPath = Join-Path ([Environment]::GetFolderPath('Desktop')) "BatteryReport_Detailed_$(Get-Date -Format 'yyyyMMdd_HHmmss').html"
             Write-Info "Generating 28-day battery report..."
             powercfg /batteryreport /output "$outPath" /duration 28 2>&1 | Out-Null
             if (Test-Path $outPath) {
@@ -300,7 +300,7 @@ Add-Tool -Id 'HW-12' -Category 'Hardware & Peripherals' -Name 'Battery reports' 
             }
         }
         '3' {
-            $outPath = "$env:USERPROFILE\Desktop\SleepStudy_$(Get-Date -Format 'yyyyMMdd_HHmmss').html"
+            $outPath = Join-Path ([Environment]::GetFolderPath('Desktop')) "SleepStudy_$(Get-Date -Format 'yyyyMMdd_HHmmss').html"
             Write-Info "Generating sleep study report..."
             powercfg /sleepstudy /output "$outPath" /duration 7 2>&1 | Out-Null
             if (Test-Path $outPath) {
@@ -316,7 +316,7 @@ Add-Tool -Id 'HW-12' -Category 'Hardware & Peripherals' -Name 'Battery reports' 
                 return
             }
             Write-Info "Running energy analysis (60 seconds) - keep system active..."
-            $outPath = "$env:USERPROFILE\Desktop\EnergyReport_$(Get-Date -Format 'yyyyMMdd_HHmmss').html"
+            $outPath = Join-Path ([Environment]::GetFolderPath('Desktop')) "EnergyReport_$(Get-Date -Format 'yyyyMMdd_HHmmss').html"
             powercfg /energy /output "$outPath" /duration 60 2>&1 | Out-Null
             if (Test-Path $outPath) {
                 Write-Check 'OK' 'Report saved' $outPath

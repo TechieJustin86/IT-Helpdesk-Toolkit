@@ -310,7 +310,7 @@ Add-Tool -Id 'RPT-09' -Category 'Reports' -Name 'Event log health report' -Descr
                     Level = $event.LevelDisplayName
                     ProviderName = $event.ProviderName
                     EventId = $event.Id
-                    Message = $event.Message.Substring(0, [math]::Min(200, $event.Message.Length))
+                    Message = "$($event.Message)".Substring(0, [math]::Min(200, "$($event.Message)".Length))
                 }
             }
         } catch { }

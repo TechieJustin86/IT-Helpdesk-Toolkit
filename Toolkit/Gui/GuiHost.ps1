@@ -161,6 +161,10 @@ function Invoke-GuiTool {
             elseif ($_ -is [System.Management.Automation.WarningRecord]) { Write-Warn $_.Message }
             else { $_ }
         } | Out-Host
+    } catch [System.OperationCanceledException] {
+        # Cancel in an input dialog is not a failure: keep it out of the error log
+        Write-Warn 'Cancelled.'
+        Write-Log "CANCELLED $($tool.Id)"
     } catch {
         Write-Err $_.Exception.Message
         Write-ErrorLog -ToolId $tool.Id -ToolName $tool.Name -ErrorRecord $_

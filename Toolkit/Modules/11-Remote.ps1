@@ -254,7 +254,7 @@ Add-Tool -Id 'RMT-10' -Category 'Remote Computers' -Name 'Remote recent errors' 
     } | Format-Table -AutoSize -Wrap | Out-Host
 }
 
-Add-Tool -Id 'REM-20' -Category 'Remote' -Name 'Copy files to remote computer' -Description 'Copy files from a server to a remote computer via network share' -Action {
+Add-Tool -Id 'REM-20' -Category 'Remote Computers' -Name 'Copy files to remote computer' -Description 'Copy files from a server to a remote computer via network share' -Action {
     Write-Info 'File Copy Utility'
     Write-Info 'This will copy one or more files to a remote computer.'
 
@@ -301,7 +301,7 @@ Add-Tool -Id 'REM-20' -Category 'Remote' -Name 'Copy files to remote computer' -
     Write-Log "Files copied to remote computer: $computerName ($successCount file(s))"
 }
 
-Add-Tool -Id 'REM-21' -Category 'Remote' -Name 'Check registry value on remote computer' -Description 'Query a registry value on remote computers in an organizational unit' -Action {
+Add-Tool -Id 'REM-21' -Category 'Remote Computers' -Name 'Check registry value on remote computer' -Description 'Query a registry value on remote computers in an organizational unit' -Action {
     Write-Info 'Remote Registry Check'
     Write-Info 'This will query a registry value across multiple computers.'
 
