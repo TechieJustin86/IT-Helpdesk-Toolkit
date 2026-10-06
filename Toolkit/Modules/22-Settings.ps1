@@ -5,7 +5,7 @@
 Add-Tool -Id 'SET-01' -Category 'Settings & Configuration' -Name 'Toolkit settings' -Description 'Configure toolkit behavior: logging, output location, feature toggles, theme preferences' -Action {
     Write-Section 'Toolkit Settings'
 
-    $settingsPath = Join-Path $PSScriptRoot '..\Settings\toolkit-settings.json'
+    $settingsPath = Join-Path $Script:ToolkitDir 'Settings\toolkit-settings.json'
     $settingsDir = Split-Path $settingsPath
 
     # Create settings directory if it doesn't exist
@@ -32,11 +32,10 @@ Add-Tool -Id 'SET-01' -Category 'Settings & Configuration' -Name 'Toolkit settin
         RemoteLogServer = ''
     }
 
-    $currentSettings = if (Test-Path $settingsPath) {
-        Get-Content $settingsPath -Raw | ConvertFrom-Json
-    } else {
-        $defaultSettings
+    if (-not (Test-Path $settingsPath)) {
+        $defaultSettings | ConvertTo-Json | Set-Content -LiteralPath $settingsPath -Encoding UTF8
     }
+    $currentSettings = Get-Content $settingsPath -Raw | ConvertFrom-Json
 
     # Display current settings
     Write-Host ''
@@ -55,7 +54,7 @@ Add-Tool -Id 'SET-01' -Category 'Settings & Configuration' -Name 'Toolkit settin
     Write-Host $(if ($currentSettings.ConfirmDestructiveActions) { 'Yes' } else { 'No' }) -ForegroundColor Green
 
     Write-Host ''
-    Write-Info 'Settings stored in: ' + $settingsPath
+    Write-Info "Settings stored in: $settingsPath"
     Write-Info 'Edit settings JSON directly for advanced configuration'
 
     if (Confirm-Action 'Open settings file in default editor?') {
@@ -191,7 +190,7 @@ Add-Tool -Id 'SET-03' -Category 'Settings & Configuration' -Name 'About the tool
 Add-Tool -Id 'SET-04' -Category 'Settings & Configuration' -Name 'Verify toolkit integrity' -Description 'Check all modules load correctly, validate syntax, and test that each category works' -Action {
     Write-Section 'Toolkit Integrity Check'
 
-    $modulesDir = if ($PSCommandPath) { Split-Path -Path $PSCommandPath } else { Split-Path -Path $PSScriptRoot }
+    $modulesDir = Join-Path $Script:ToolkitDir 'Modules'
     $allGood = $true
     $errors = @()
 
@@ -229,13 +228,13 @@ Add-Tool -Id 'SET-04' -Category 'Settings & Configuration' -Name 'Verify toolkit
     $criticalFiles = @(
         'HelpdeskToolkit.ps1',
         'HelpdeskToolkit-GUI.ps1',
-        '..\Core\Common.ps1',
-        '..\Core\Menu.ps1',
-        '..\Gui\GuiHost.ps1'
+        'Core\Common.ps1',
+        'Core\Menu.ps1',
+        'Gui\GuiHost.ps1'
     )
 
     foreach ($file in $criticalFiles) {
-        $fullPath = Join-Path $modulesDir $file
+        $fullPath = Join-Path $Script:ToolkitDir $file
         if (Test-Path $fullPath) {
             Write-Check -Status OK -Label (Split-Path $file -Leaf) -Value 'Found'
         } else {
