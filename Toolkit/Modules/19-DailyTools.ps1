@@ -7,7 +7,7 @@ Add-Tool -Id 'DAILY-01' -Category 'Daily Utilities' -Name 'Quick PC health check
 
     # Get all info in one go
     $os = Get-CimInstance Win32_OperatingSystem
-    $disk = Get-Volume -DriveLetter C -ErrorAction SilentlyContinue
+    $disk = Get-Volume -DriveLetter $env:SystemDrive.TrimEnd(':') -ErrorAction SilentlyContinue
     $defender = Get-MpComputerStatus -ErrorAction SilentlyContinue
     $fw = Get-NetFirewallProfile | Where-Object { $_.Enabled -eq $false }
 
@@ -25,7 +25,7 @@ Add-Tool -Id 'DAILY-01' -Category 'Daily Utilities' -Name 'Quick PC health check
     # Display
     Write-Check -Status $(if ($cpuPercent -lt 50) { 'OK' } else { 'WARN' }) -Label 'CPU' -Value "$cpuPercent%"
     Write-Check -Status $(if ($memPercent -lt 80) { 'OK' } else { 'WARN' }) -Label 'Memory' -Value "$memPercent%"
-    Write-Check -Status $(if ($diskPercent -lt 80) { 'OK' } else { 'WARN' }) -Label 'Disk (C:)' -Value "$diskPercent%"
+    Write-Check -Status $(if ($diskPercent -lt 80) { 'OK' } else { 'WARN' }) -Label "Disk ($env:SystemDrive)" -Value "$diskPercent%"
     Write-Check -Status $(if ($defender.RealTimeProtectionEnabled) { 'OK' } else { 'WARN' }) -Label 'Defender' -Value $(if ($defender.RealTimeProtectionEnabled) { 'Protected' } else { 'Disabled' })
     Write-Check -Status $(if (-not $fw) { 'OK' } else { 'WARN' }) -Label 'Firewall' -Value $(if (-not $fw) { 'Enabled' } else { 'Disabled' })
 
@@ -40,7 +40,7 @@ Add-Tool -Id 'DAILY-02' -Category 'Daily Utilities' -Name 'Copy system info to c
     $os = Get-CimInstance Win32_OperatingSystem
     $computer = Get-CimInstance Win32_ComputerSystem
     $cpu = Get-CimInstance Win32_Processor
-    $disk = Get-Volume -DriveLetter C -ErrorAction SilentlyContinue
+    $disk = Get-Volume -DriveLetter $env:SystemDrive.TrimEnd(':') -ErrorAction SilentlyContinue
     $uptime = $os.LocalDateTime - $os.LastBootUpTime
 
     $summary = @"
@@ -92,7 +92,7 @@ Add-Tool -Id 'DAILY-04' -Category 'Daily Utilities' -Name 'Generate device docum
     $computer = Get-CimInstance Win32_ComputerSystem
     $cpu = Get-CimInstance Win32_Processor
     $memory = Get-CimInstance Win32_PhysicalMemory
-    $disk = Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='C:'"
+    $disk = Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='$env:SystemDrive'"
     $bios = Get-CimInstance Win32_BIOS
     $nic = Get-CimInstance Win32_NetworkAdapterConfiguration | Where-Object { $_.IPEnabled }
 
@@ -174,9 +174,9 @@ Add-Tool -Id 'DAILY-05' -Category 'Daily Utilities' -Name 'Remote desktop launch
 
     $choice = Read-Host '  Pick one (or leave blank)'
     if ($choice -and $choice -ge 1 -and $choice -le $remoteServers.Count) {
-        $host = $remoteServers[$choice - 1].Host
-        Write-Info "Connecting to $host..."
-        mstsc /v:$host
+        $rdpHost = $remoteServers[$choice - 1].Host
+        Write-Info "Connecting to $rdpHost..."
+        mstsc /v:$rdpHost
     } else {
         Write-Info 'Skipped'
     }
@@ -191,26 +191,15 @@ Add-Tool -Id 'DAILY-06' -Category 'Daily Utilities' -Name 'Send test email' -Des
     $port = Read-Host '  Port (or leave for 587)'
     if (-not $port) { $port = 587 }
 
-    $email = Read-Host '  Your email address'
-    $recipient = Read-Host '  Test recipient email'
 
     Write-Info 'Testing email connectivity...'
 
     try {
-        $smtp = New-Object Net.Mail.SmtpClient($smtpServer, $port)
-        $smtp.EnableSsl = $true
-        $smtp.Timeout = 5000
-
-        $smtp.GetType().GetMethod("SendAsyncCancel")
-
-        Write-Ok "SMTP Server: $smtpServer - Reachable"
-        Write-Ok "Port $($port): Open"
-        Write-Ok "Email connectivity: OK"
-
-        if (Confirm-Action "Send test email to $recipient?") {
-            Write-Info 'Note: This requires credentials. Skipping actual send for security.'
-            Write-Ok 'Email test successful'
-        }
+        # Only a TCP connection test: the old code reported "Reachable / Open / OK" without contacting the server
+        $reachable = (Test-NetConnection -ComputerName $smtpServer -Port ([int]$port) -WarningAction SilentlyContinue).TcpTestSucceeded
+        if ($reachable) { Write-Ok "SMTP server $smtpServer accepts connections on port $port" }
+        else { Write-Err "Cannot connect to $smtpServer on port $port (blocked, wrong port or server name)"; return }
+        Write-Info 'Sending needs credentials, so no message is sent - this only tests the connection.'
     } catch {
         Write-Err "Email connectivity failed: $_"
     }
