@@ -92,7 +92,6 @@ Add-Tool -Id 'INTUNE-03' -Category 'Intune Management' -Name 'Check Intune polic
 
     # Check password policy
     Write-Info 'Password Policy:'
-    $pwd = Get-LocalUser | Select-Object -First 1 -ExpandProperty Name
     Write-Check -Status INFO -Label 'Policy source' -Value 'Check Local Group Policy Editor (gpedit.msc)'
 
     Write-Host ''
@@ -129,8 +128,8 @@ Add-Tool -Id 'INTUNE-04' -Category 'Intune Management' -Name 'Troubleshoot Intun
 
     # Check logs
     Write-Info 'Checking event logs...'
-    $mdmEvents = Get-EventLog -LogName System -Source 'Microsoft-Windows-DeviceManagement-Enterprise-Diagnostics-Provider' -Newest 10 -ErrorAction SilentlyContinue | Where-Object { $_.EntryType -eq 'Error' }
-    if ($mdmEvents) {
+    $mdmEvents = @(Get-WinEvent -FilterHashtable @{ LogName = 'Microsoft-Windows-DeviceManagement-Enterprise-Diagnostics-Provider/Admin'; Level = 2 } -MaxEvents 10 -ErrorAction SilentlyContinue)
+    if ($mdmEvents.Count) {
         $issues += "Found $($mdmEvents.Count) error(s) in MDM event log"
     }
 
@@ -141,7 +140,7 @@ Add-Tool -Id 'INTUNE-04' -Category 'Intune Management' -Name 'Troubleshoot Intun
     } else {
         Write-Warn "Found $($issues.Count) issue(s):"
         Write-Host ''
-        $issues | ForEach-Object { Write-Host "  • $_" -ForegroundColor Yellow }
+        $issues | ForEach-Object { Write-Host "  - $_" -ForegroundColor Yellow }
 
         Write-Host ''
         Write-Info 'Suggested fixes:'
@@ -158,12 +157,12 @@ Add-Tool -Id 'INTUNE-05' -Category 'Intune Management' -Name 'Export device comp
     $complianceInfo = [pscustomobject]@{
         ComputerName = $env:COMPUTERNAME
         User = $env:USERNAME
-        OSVersion = (Get-WmiObject -Class Win32_OperatingSystem).Caption
+        OSVersion = (Get-CimInstance -ClassName Win32_OperatingSystem).Caption
         Enrolled = $(if (Get-CimInstance -Namespace 'root\cimv2\mdm\dmmap' -ClassName DMClient -ErrorAction SilentlyContinue) { 'Yes' } else { 'No' })
         BitLocker = $(if ((Get-BitLockerVolume -ErrorAction SilentlyContinue).ProtectionStatus -eq 'On') { 'Enabled' } else { 'Disabled' })
         Firewall = $(if ((Get-NetFirewallProfile | Where-Object { $_.Enabled }).Count -gt 0) { 'Enabled' } else { 'Disabled' })
         Defender = $(if (Get-MpPreference -ErrorAction SilentlyContinue) { 'Installed' } else { 'Not Found' })
-        LastSync = $(Get-ItemProperty -Path 'HKCU\Software\Microsoft\Windows\CurrentVersion\MDM' -Name LastSuccessfulSync -ErrorAction SilentlyContinue).LastSuccessfulSync
+        LastSync = $(Get-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\MDM' -Name LastSuccessfulSync -ErrorAction SilentlyContinue).LastSuccessfulSync
         Timestamp = Get-Date
     }
 
