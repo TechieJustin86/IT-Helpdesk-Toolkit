@@ -27,7 +27,7 @@ Add-Tool -Id 'DEV-01' -Category 'Developer & Debugging' -Name 'Tool explorer' -D
 Add-Tool -Id 'DEV-02' -Category 'Developer & Debugging' -Name 'Module diagnostics' -Description 'Check which modules loaded successfully, show any syntax errors or loading warnings' -Action {
     Write-Section 'Module Diagnostics'
 
-    $modulesDir = if ($PSCommandPath) { Split-Path -Path $PSCommandPath } else { Join-Path $Script:ToolkitDir 'Modules' }
+    $modulesDir = Join-Path $Script:ToolkitDir 'Modules'
     $moduleFiles = Get-ChildItem -Path $modulesDir -Filter *.ps1 | Sort-Object Name
 
     Write-Info "Checking all modules:"
@@ -36,7 +36,10 @@ Add-Tool -Id 'DEV-02' -Category 'Developer & Debugging' -Name 'Module diagnostic
     foreach ($file in $moduleFiles) {
         try {
             $content = Get-Content -Path $file.FullName -Raw
-            $null = [System.Management.Automation.PSParser]::Tokenize($content, [ref]$null)
+            # Tokenize reports syntax errors through the [ref] argument; it does not throw
+            $tokenErrors = $null
+            $null = [System.Management.Automation.PSParser]::Tokenize($content, [ref]$tokenErrors)
+            if ($tokenErrors.Count) { throw "$($tokenErrors[0].Message) (line $($tokenErrors[0].Token.StartLine))" }
             $toolCount = (($content -split 'Add-Tool' | Measure-Object).Count - 1)
             Write-Check -Status OK -Label $file.Name -Value "$toolCount tools defined"
         } catch {
@@ -74,7 +77,7 @@ Add-Tool -Id 'DEV-03' -Category 'Developer & Debugging' -Name 'Tool statistics' 
     }
 
     Write-Section 'Module file sizes:'
-    $modulesDir = Split-Path -Path $PSCommandPath
+    $modulesDir = Join-Path $Script:ToolkitDir 'Modules'
     Get-ChildItem -Path $modulesDir -Filter *.ps1 | Sort-Object Name | ForEach-Object {
         $kb = [Math]::Round($_.Length / 1KB, 1)
         Write-Check -Status INFO -Label "  $($_.Name)" -Value "$kb KB"
@@ -117,7 +120,8 @@ Add-Tool -Id 'DEV-05' -Category 'Developer & Debugging' -Name 'Search tools by n
     $search = Read-Host '  Search for (partial name or keyword)'
     if (-not $search) { return }
 
-    $results = $Script:Tools | Where-Object { $_.Name -match $search -or $_.Description -match $search } | Sort-Object Category, Name
+    $pattern = [regex]::Escape($search)
+    $results = $Script:Tools | Where-Object { $_.Name -match $pattern -or $_.Description -match $pattern } | Sort-Object Category, Name
 
     if ($results.Count -eq 0) {
         Write-Info "No tools found matching '$search'"
