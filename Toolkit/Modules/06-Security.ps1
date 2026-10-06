@@ -306,7 +306,7 @@ Add-Tool -Id 'SEC-17' -Category 'Security' -Name 'Startup program manager' -Desc
     Write-Log "Startup item '$($e.Name)' $(if ($enable) { 'enabled' } else { 'disabled' })"
 }
 
-Add-Tool -Id 'SEC-15' -Category 'Security' -Name 'BitLocker status' -Admin -Description 'Encryption status for all volumes and recovery key management' -Action {
+Add-Tool -Id 'SEC-18' -Category 'Security' -Name 'BitLocker status' -Admin -Description 'Encryption status for all volumes and recovery key management' -Action {
     Write-Section 'BitLocker Encryption Status'
 
     try {
@@ -339,11 +339,11 @@ Add-Tool -Id 'SEC-15' -Category 'Security' -Name 'BitLocker status' -Admin -Desc
     }
 }
 
-Add-Tool -Id 'SEC-16' -Category 'Security' -Name 'TPM status' -Description 'Trusted Platform Module presence, version and capabilities' -Action {
+Add-Tool -Id 'SEC-19' -Category 'Security' -Name 'TPM status' -Description 'Trusted Platform Module presence, version and capabilities' -Action {
     Write-Section 'TPM (Trusted Platform Module) Status'
 
     try {
-        $tpm = Get-WmiObject -Namespace root\cimv2\security\microsofttpm -Class Win32_Tpm -ErrorAction SilentlyContinue
+        $tpm = Get-CimInstance -Namespace root\cimv2\security\microsofttpm -ClassName Win32_Tpm -ErrorAction SilentlyContinue
         if (-not $tpm) {
             Write-Warn 'No TPM detected or not accessible'
             Write-Info 'Check BIOS settings - TPM may need to be enabled'
@@ -366,8 +366,8 @@ Add-Tool -Id 'SEC-16' -Category 'Security' -Name 'TPM status' -Description 'Trus
     }
 }
 
-Add-Tool -Id 'SEC-17' -Category 'Security' -Name 'Product key retrieval' -Description 'Windows and Office product keys (requires Administrator)' -Action {
-    if (-not (Test-Admin)) {
+Add-Tool -Id 'SEC-20' -Category 'Security' -Name 'Product key retrieval' -Description 'Windows and Office product keys (requires Administrator)' -Action {
+    if (-not (Test-IsAdmin)) {
         Write-Warn 'Administrator privileges required'
         return
     }
