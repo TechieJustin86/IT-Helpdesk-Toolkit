@@ -439,7 +439,7 @@ $Script:SharedStyles
               </ItemsControl.ItemsPanel>
               <ItemsControl.ItemTemplate>
                 <DataTemplate>
-                  <Button x:Name="QuickAccessButton" Content="{Binding Id}" Margin="4,2" Padding="8,4" Style="{StaticResource Btn}" FontSize="11" ToolTip="{Binding Name}" Tag="{Binding}"/>
+                  <Button Content="{Binding Id}" Margin="4,2" Padding="8,4" Style="{StaticResource Btn}" FontSize="11" ToolTip="{Binding Name}" Tag="{Binding}"/>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
@@ -1078,15 +1078,15 @@ if (-not (Test-Path $consoleScript)) { $ui.ConsoleButton.Visibility = 'Collapsed
 
 $ui.ClearSearchButton.Content = [string][char]0xE711
 
-# Handle Quick Access button clicks (buttons in ItemsControl template)
-$ui.QuickAccessList.AddHandler([System.Windows.Controls.Button]::ClickEvent, {
-    param($sender, $e)
-    $btn = $e.Source -as [System.Windows.Controls.Button]
+# Buttons swallow mouse events, so listen for their bubbled Click; the delegate must be typed or AddHandler finds no overload
+$ui.QuickAccessList.AddHandler([System.Windows.Controls.Primitives.ButtonBase]::ClickEvent, [System.Windows.RoutedEventHandler]{
+    param($s, $e)
+    $btn = $e.OriginalSource -as [System.Windows.Controls.Button]
     if ($btn -and $btn.Tag) {
         Start-Tool $btn.Tag
         $e.Handled = $true
     }
-}, $true)
+})
 $ui.CategoryList.Add_SelectionChanged({
     if (-not $Script:SuppressCategoryEvent) {
         $Script:Ui.SearchBox.Text = ''
