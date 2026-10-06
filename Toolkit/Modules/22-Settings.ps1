@@ -190,7 +190,7 @@ Add-Tool -Id 'SET-03' -Category 'Settings & Configuration' -Name 'About the tool
 Add-Tool -Id 'SET-04' -Category 'Settings & Configuration' -Name 'Verify toolkit integrity' -Description 'Check all modules load correctly, validate syntax, and test that each category works' -Action {
     Write-Section 'Toolkit Integrity Check'
 
-    $modulesDir = if ($PSCommandPath) { Split-Path -Path $PSCommandPath } else { Split-Path -Path $PSScriptRoot }
+    $modulesDir = Join-Path $Script:ToolkitDir 'Modules'
     $allGood = $true
     $errors = @()
 
@@ -228,13 +228,13 @@ Add-Tool -Id 'SET-04' -Category 'Settings & Configuration' -Name 'Verify toolkit
     $criticalFiles = @(
         'HelpdeskToolkit.ps1',
         'HelpdeskToolkit-GUI.ps1',
-        '..\Core\Common.ps1',
-        '..\Core\Menu.ps1',
-        '..\Gui\GuiHost.ps1'
+        'Core\Common.ps1',
+        'Core\Menu.ps1',
+        'Gui\GuiHost.ps1'
     )
 
     foreach ($file in $criticalFiles) {
-        $fullPath = Join-Path $modulesDir $file
+        $fullPath = Join-Path $Script:ToolkitDir $file
         if (Test-Path $fullPath) {
             Write-Check -Status OK -Label (Split-Path $file -Leaf) -Value 'Found'
         } else {
