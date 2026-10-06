@@ -14,7 +14,7 @@ Add-Tool -Id 'SET-01' -Category 'Settings & Configuration' -Name 'Toolkit settin
     }
 
     # Load or create default settings
-    $documentsPath = if ($env:DOCUMENTS) { $env:DOCUMENTS } else { Join-Path $env:USERPROFILE 'Documents' }
+    $documentsPath = [Environment]::GetFolderPath('MyDocuments')
     $defaultSettings = @{
         Version = '2.0'
         LastModified = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
@@ -126,13 +126,13 @@ Add-Tool -Id 'SET-03' -Category 'Settings & Configuration' -Name 'About the tool
     Write-Section 'About IT Helpdesk Toolkit'
 
     Write-Host ''
-    Write-Host 'Version: 2.0' -ForegroundColor Cyan
+    Write-Host "Version: $Script:Version" -ForegroundColor Cyan
     Write-Host 'Released: 2026-09-29' -ForegroundColor Cyan
     Write-Host 'Status: Production Ready ✓' -ForegroundColor Green
     Write-Host ''
 
     Write-Host 'What is this?'
-    Write-Host '  Comprehensive Windows IT support toolkit with 228 tools across 20 categories'
+    Write-Host "  Comprehensive Windows IT support toolkit with $($Script:Tools.Count) tools across $(@($Script:Tools | ForEach-Object Category | Select-Object -Unique).Count) categories"
     Write-Host '  Includes system diagnostics, maintenance, security, network tools, and more'
     Write-Host '  Works on any Windows machine without additional software installation'
     Write-Host ''
@@ -182,7 +182,7 @@ Add-Tool -Id 'SET-03' -Category 'Settings & Configuration' -Name 'About the tool
     Write-Host ''
 
     Write-Host 'Support & Reporting:'
-    Write-Host '  • GitHub: https://github.com/TechieJustin86/PS-IT-Helpdesk-Toolkit'
+    Write-Host '  • GitHub: https://github.com/TechieJustin86/IT-Helpdesk-Toolkit'
     Write-Host '  • Issues: Use GitHub Issues to report bugs'
     Write-Host '  • Suggestions: Feature requests welcome'
 }
@@ -204,7 +204,10 @@ Add-Tool -Id 'SET-04' -Category 'Settings & Configuration' -Name 'Verify toolkit
     foreach ($file in $moduleFiles) {
         try {
             $content = Get-Content -Path $file.FullName -Raw
-            $null = [System.Management.Automation.PSParser]::Tokenize($content, [ref]$null)
+            # Tokenize reports syntax errors through the [ref] argument; it does not throw
+            $tokenErrors = $null
+            $null = [System.Management.Automation.PSParser]::Tokenize($content, [ref]$tokenErrors)
+            if ($tokenErrors.Count) { throw "$($tokenErrors[0].Message) (line $($tokenErrors[0].Token.StartLine))" }
             $toolCount = (($content -split 'Add-Tool' | Measure-Object).Count - 1)
             Write-Check -Status OK -Label $file.Name -Value "$toolCount tools defined"
         } catch {
