@@ -421,3 +421,137 @@ Add-Tool -Id 'MNT-24' -Category 'Maintenance' -Name 'Fix Outlook password prompt
         Write-Warn 'Could not locate Outlook registry settings. Outlook may not be installed.'
     }
 }
+
+Add-Tool -Id 'MNT-26' -Category 'Maintenance & Repair' -Name 'Remove Bloatware' -Admin -Description 'Remove common Windows bloatware and pre-installed apps (interactively)' -Action {
+    Write-Section 'Bloatware Removal Tool'
+    Write-Host 'This tool helps remove common Windows bloatware apps.'
+    Write-Host ''
+
+    # Common bloatware app packages to offer for removal
+    $bloatwareApps = @(
+        @('Clipchamp.Clipchamp', 'Clipchamp Video Editor'),
+        @('Microsoft.BingNews', 'Bing News'),
+        @('Microsoft.BingWeather', 'Bing Weather'),
+        @('Microsoft.GamingApp', 'Xbox Game Pass'),
+        @('Microsoft.MixedReality.Portal', 'Mixed Reality Portal'),
+        @('Microsoft.OneDrive', 'OneDrive'),
+        @('Microsoft.People', 'People'),
+        @('Microsoft.SkypeApp', 'Skype'),
+        @('Microsoft.Solitaire', 'Solitaire'),
+        @('Microsoft.WindowsCommunicationsApps', 'Mail & Calendar'),
+        @('Microsoft.WindowsFeedbackHub', 'Feedback Hub'),
+        @('Microsoft.WindowsMaps', 'Maps'),
+        @('Microsoft.XboxApp', 'Xbox app'),
+        @('Microsoft.ZuneMusic', 'Groove Music'),
+        @('Microsoft.ZuneVideo', 'Movies & TV')
+    )
+
+    Write-Info 'Scanning installed Appx packages...'
+    try {
+        $installed = Get-AppxPackage -ErrorAction Stop | Select-Object -ExpandProperty Name
+    } catch {
+        Write-Err "Failed to retrieve installed apps: $($_.Exception.Message)"
+        return
+    }
+
+    Write-Host ''
+    Write-Host 'Available bloatware for removal:'
+    Write-Host ''
+    $removable = @()
+    foreach ($app in $bloatwareApps) {
+        $match = $installed | Where-Object { $_ -like "$($app[0])*" }
+        if ($match) {
+            $removable += [pscustomobject]@{ PackageName = $match; DisplayName = $app[1] }
+            Write-Host "  [$($removable.Count)] $($app[1])"
+        }
+    }
+
+    if ($removable.Count -eq 0) {
+        Write-Ok 'No common bloatware found on this PC.'
+        return
+    }
+
+    Write-Host ''
+    Write-Host 'Enter comma-separated numbers to remove (e.g., 1,3,5 or "all"), or press Enter to skip'
+    $choice = Read-Host '  Selection'
+
+    if (-not $choice) { Write-Info 'Cancelled.'; return }
+
+    $toRemove = @()
+    if ($choice -eq 'all') {
+        $toRemove = $removable
+    } else {
+        $numbers = $choice -split ',' | ForEach-Object { [int]$_.Trim() - 1 }
+        foreach ($n in $numbers) {
+            if ($n -ge 0 -and $n -lt $removable.Count) {
+                $toRemove += $removable[$n]
+            }
+        }
+    }
+
+    if ($toRemove.Count -eq 0) { Write-Info 'No valid selections.'; return }
+
+    Write-Host ''
+    Write-Info "Removing $($toRemove.Count) app(s)..."
+    $removed = 0
+    $failed = 0
+
+    foreach ($app in $toRemove) {
+        try {
+            Remove-AppxPackage -Package $app.PackageName -ErrorAction Stop
+            Write-Ok "Removed: $($app.DisplayName)"
+            $removed++
+        } catch {
+            Write-Warn "Failed to remove $($app.DisplayName): $($_.Exception.Message)"
+            $failed++
+        }
+    }
+
+    Write-Host ''
+    Write-Ok "Complete: $removed removed, $failed failed."
+}
+
+Add-Tool -Id 'MNT-27' -Category 'Maintenance & Repair' -Name 'Rename PC' -Admin -Description 'Change the computer name and optionally join/leave a domain' -Action {
+    Write-Section 'PC Rename'
+    Write-Host ''
+
+    $currentName = [System.Net.Dns]::GetHostName()
+    Write-Info "Current computer name: $currentName"
+    Write-Host ''
+
+    $newName = Read-Host '  New computer name'
+    if (-not $newName -or $newName -eq $currentName) {
+        Write-Info 'No change requested.'
+        return
+    }
+
+    # Validate computer name (max 15 chars, no special chars except hyphen)
+    if ($newName.Length -gt 15) {
+        Write-Err 'Computer name must be 15 characters or fewer.'
+        return
+    }
+    if ($newName -notmatch '^[a-zA-Z0-9-]+$') {
+        Write-Err 'Computer name can only contain letters, numbers, and hyphens.'
+        return
+    }
+
+    Write-Host ''
+    Write-Info "This PC will be renamed to: $newName"
+    Write-Warn "A restart is required for the change to take effect."
+    Write-Host ''
+
+    if (-not (Confirm-Action 'Proceed with rename?')) { return }
+
+    try {
+        Rename-Computer -NewName $newName -Force -ErrorAction Stop
+        Write-Ok "PC renamed to '$newName'. You must restart for changes to take effect."
+        Write-Info "Restart this PC to complete the change."
+        if (Confirm-Action 'Restart now?') {
+            Write-Info 'Restarting...'
+            Start-Sleep -Seconds 2
+            Restart-Computer -Force
+        }
+    } catch {
+        Write-Err "Failed to rename computer: $($_.Exception.Message)"
+    }
+}
