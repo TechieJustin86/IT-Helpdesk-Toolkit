@@ -429,8 +429,10 @@ $Script:SharedStyles
 
       <Border Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,10,0">
         <DockPanel>
-          <StackPanel x:Name="QuickAccessPanel" DockPanel.Dock="Top" Visibility="Collapsed">
+          <StackPanel x:Name="QuickAccessPanel" DockPanel.Dock="Top">
             <TextBlock Text="QUICK ACCESS" Style="{StaticResource PanelHeader}"/>
+            <TextBlock x:Name="QuickAccessHint" Text="Right-click a tool and choose Add to Quick Access." Foreground="{DynamicResource Faint}"
+                       FontSize="11" Margin="16,0,12,4" TextWrapping="Wrap"/>
             <ItemsControl x:Name="QuickAccessList" ItemsSource="{Binding}">
               <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
@@ -443,6 +445,7 @@ $Script:SharedStyles
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
+            <Border Height="1" Background="{DynamicResource CardBorder}" Margin="12,10,12,0"/>
           </StackPanel>
           <TextBlock DockPanel.Dock="Top" Text="CATEGORIES" Style="{StaticResource PanelHeader}"/>
           <ListBox x:Name="CategoryList" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
@@ -577,7 +580,7 @@ $ui = @{}
 foreach ($name in 'VersionText', 'MachineText', 'AdminBadge', 'AdminText', 'ElevateButton', 'HelpButton', 'ThemeButton', 'ThemeIcon', 'ThemeLabel',
                   'StatusText', 'ProgressText', 'CategoryList', 'SearchBox', 'SearchHint', 'ClearSearchButton', 'ToolListHeader', 'ToolList', 'ToolTitle',
                   'ToolMeta', 'ToolDesc', 'ToolAdminNote', 'RunButton', 'StopButton', 'Output', 'CopyButton', 'SaveButton',
-                  'FavButton', 'FavIcon', 'FavLabel', 'EmptyHint', 'QuickAccessPanel', 'QuickAccessList',
+                  'FavButton', 'FavIcon', 'FavLabel', 'EmptyHint', 'QuickAccessPanel', 'QuickAccessList', 'QuickAccessHint',
                   'ClearButton', 'FolderButton', 'ConsoleButton') {
     $ui[$name] = $Script:Window.FindName($name)
 }
@@ -868,6 +871,8 @@ $Script:CategoryIcons = @{
     'Microsoft 365' = 0xE753; 'Tickets & Cases' = 0xE70B
 }
 
+$Script:QuickAccessMax = 6
+
 function Get-FavoriteTools {
     # In the order they were added; IDs of tools that no longer exist are skipped
     @(foreach ($id in $Script:Favorites) { $Script:AllTools | Where-Object Id -eq $id | Select-Object -First 1 })
@@ -882,9 +887,6 @@ function Get-RecentTools {
     @($Script:AllTools | Where-Object { $Script:RecentTools.Contains($_.Id) } | Sort-Object { $Script:RecentTools.IndexOf($_.Id) })
 }
 
-function Get-QuickAccessTools {
-    @(Get-RecentTools | Select-Object -First 5)
-}
 
 function Update-CategoryList {
     param([string]$SelectKey)
@@ -901,14 +903,10 @@ function Update-CategoryList {
         $glyph = if ($Script:CategoryIcons.ContainsKey($c)) { $Script:CategoryIcons[$c] } else { 0xE8B7 }
         $items += [pscustomobject]@{ Key = "cat:$c"; Kind = 'cat'; Name = $c; Display = $c; Icon = [string][char]$glyph; Count = @($Script:AllTools | Where-Object Category -eq $c).Count }
     }
-    # Update quick access bar
-    $quickTools = @(Get-QuickAccessTools)
-    if ($quickTools.Count -gt 0) {
-        $Script:Ui.QuickAccessPanel.Visibility = 'Visible'
-        $Script:Ui.QuickAccessList.ItemsSource = @($quickTools)
-    } else {
-        $Script:Ui.QuickAccessPanel.Visibility = 'Collapsed'
-    }
+    # Quick Access shows the favorites, in their saved order
+    $quickTools = @(Get-FavoriteTools | Select-Object -First $Script:QuickAccessMax)
+    $Script:Ui.QuickAccessList.ItemsSource = $quickTools
+    $Script:Ui.QuickAccessHint.Visibility = if ($quickTools.Count) { 'Collapsed' } else { 'Visible' }
     $Script:SuppressCategoryEvent = $true
     $Script:Ui.CategoryList.ItemsSource = $items
     $idx = 0
@@ -992,12 +990,12 @@ function Update-FavButton {
         $Script:Ui.FavIcon.Text = $Script:StarFilled
         $Script:Ui.FavIcon.Foreground = $Script:Gold
         $Script:Ui.FavLabel.Text = 'Favorited'
-        $Script:Ui.FavButton.ToolTip = 'Remove from favorites (Ctrl+B)'
+        $Script:Ui.FavButton.ToolTip = 'Remove from favorites and Quick Access (Ctrl+B)'
     } else {
         $Script:Ui.FavIcon.Text = $Script:StarOutline
         $Script:Ui.FavIcon.ClearValue([System.Windows.Controls.TextBlock]::ForegroundProperty)
         $Script:Ui.FavLabel.Text = 'Favorite'
-        $Script:Ui.FavButton.ToolTip = 'Add to favorites (Ctrl+B)'
+        $Script:Ui.FavButton.ToolTip = 'Add to favorites and Quick Access (Ctrl+B)'
     }
 }
 
@@ -1006,10 +1004,13 @@ function Switch-Favorite {
     if (-not $Tool) { return }
     if ($Script:Favorites.Contains($Tool.Id)) {
         [void]$Script:Favorites.Remove($Tool.Id)
-        $Script:Ui.StatusText.Text = "Removed $($Tool.Name) from favorites."
+        $Script:Ui.StatusText.Text = "Removed $($Tool.Name) from favorites and Quick Access."
+    } elseif (@(Get-FavoriteTools).Count -ge $Script:QuickAccessMax) {
+        $Script:Ui.StatusText.Text = "Quick Access is full ($Script:QuickAccessMax tools). Right-click a Quick Access button and remove one first."
+        return
     } else {
         $Script:Favorites.Add($Tool.Id)
-        $Script:Ui.StatusText.Text = "Added $($Tool.Name) to favorites."
+        $Script:Ui.StatusText.Text = "Added $($Tool.Name) to favorites and Quick Access."
     }
     Save-Settings
     Update-FavMarks
@@ -1055,10 +1056,34 @@ $Script:MenuFav.Add_Click({ Switch-Favorite $Script:Ui.ToolList.SelectedItem })
 $Script:ToolMenu.Add_Opened({
     $t = $Script:Ui.ToolList.SelectedItem
     $Script:MenuRun.IsEnabled = $Script:Ui.RunButton.IsEnabled
-    $Script:MenuFav.IsEnabled = [bool]$t
-    $Script:MenuFav.Header = if ($t -and $Script:Favorites.Contains($t.Id)) { 'Remove from favorites' } else { 'Add to favorites' }
+    $isFav = $t -and $Script:Favorites.Contains($t.Id)
+    $full = @(Get-FavoriteTools).Count -ge $Script:QuickAccessMax
+    $Script:MenuFav.IsEnabled = [bool]$t -and ($isFav -or -not $full)
+    $Script:MenuFav.Header = if ($isFav) { 'Remove from Quick Access' } elseif ($full) { "Add to Quick Access (full - $Script:QuickAccessMax max)" } else { 'Add to Quick Access' }
 })
 $ui.ToolList.ContextMenu = $Script:ToolMenu
+
+# Right-click menu on the Quick Access buttons; the clicked button's tool is remembered when the menu opens
+$Script:QuickMenuTool = $null
+$Script:QuickMenu = New-Object System.Windows.Controls.ContextMenu
+$Script:QuickMenuRun = New-Object System.Windows.Controls.MenuItem
+$Script:QuickMenuRun.Header = 'Run'
+$Script:QuickMenuRun.Add_Click({ Start-Tool $Script:QuickMenuTool })
+$Script:QuickMenuRemove = New-Object System.Windows.Controls.MenuItem
+$Script:QuickMenuRemove.Header = 'Remove from Quick Access'
+$Script:QuickMenuRemove.Add_Click({ Switch-Favorite $Script:QuickMenuTool })
+[void]$Script:QuickMenu.Items.Add($Script:QuickMenuRun)
+[void]$Script:QuickMenu.Items.Add($Script:QuickMenuRemove)
+$ui.QuickAccessList.ContextMenu = $Script:QuickMenu
+$ui.QuickAccessList.Add_ContextMenuOpening({
+    $node = $_.OriginalSource
+    while ($node -and $node -isnot [System.Windows.Controls.Button]) {
+        $node = if ($node -is [System.Windows.Media.Visual]) { [System.Windows.Media.VisualTreeHelper]::GetParent($node) } else { $null }
+    }
+    if (-not $node -or -not $node.Tag) { $_.Handled = $true; return }
+    $Script:QuickMenuTool = $node.Tag
+    $Script:QuickMenuRun.IsEnabled = -not $Script:Current -and -not ($node.Tag.Admin -and -not $Script:IsAdmin)
+})
 
 $ui.VersionText.Text = "v$($Script:Info.Version)"
 $ui.MachineText.Text = "$env:COMPUTERNAME   |   $env:USERDOMAIN\$env:USERNAME"
@@ -1134,6 +1159,7 @@ $ui.ToolList.Add_Drop({
                 $Script:Favorites.Remove($dragId)
                 $Script:Favorites.Insert($dropIndex, $dragId)
                 Save-Settings
+                Update-CategoryList
                 Update-ToolList
             }
         }

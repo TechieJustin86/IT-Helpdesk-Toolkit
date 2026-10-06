@@ -27,8 +27,8 @@ Add-Tool -Id 'TKA-02' -Category 'Toolkit Administration' -Name 'Toolkit integrit
     Write-Section 'Verifying Toolkit Integrity'
 
     $coreFiles = @('Common.ps1', 'Config.ps1', 'Dependencies.ps1', 'Validation.ps1', 'Cache.ps1', 'ResourceManagement.ps1', 'ErrorHandling.ps1', 'SecurityManagement.ps1')
-    $coreDir = Join-Path $PSScriptRoot 'Core'
-    $modulesDir = Join-Path $PSScriptRoot 'Modules'
+    $coreDir = Join-Path $Script:ToolkitDir 'Core'
+    $modulesDir = Join-Path $Script:ToolkitDir 'Modules'
 
     $missing = @()
     foreach ($file in $coreFiles) {
@@ -65,7 +65,7 @@ Add-Tool -Id 'TKA-03' -Category 'Toolkit Administration' -Name 'Toolkit diagnost
     Write-Check 'INFO' 'Running as Admin' $(if (Test-IsAdmin) { 'Yes' } else { 'No' })
 
     Write-Section 'File Structure'
-    $toolkitRoot = Split-Path $PSScriptRoot -Parent
+    $toolkitRoot = $Script:ToolkitDir
     Write-Check 'INFO' 'Toolkit Root' $toolkitRoot
     Write-Check 'INFO' 'Core Directory' "$(Test-Path (Join-Path $toolkitRoot 'Core'))"
     Write-Check 'INFO' 'Modules Directory' "$(Test-Path (Join-Path $toolkitRoot 'Modules'))"
