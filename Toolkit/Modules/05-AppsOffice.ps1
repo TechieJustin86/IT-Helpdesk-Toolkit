@@ -28,7 +28,7 @@ Add-Tool -Id 'APP-03' -Category 'Apps & Office' -Name 'Uninstall an application'
     if (-not $cmd) { Write-Err 'No uninstall command registered for this app.'; return }
     Write-Info "Command: $cmd"
     if (Confirm-Action "Uninstall $($app.DisplayName)?") {
-        Start-Process cmd.exe -ArgumentList "/c `"$cmd`"" -Wait
+        $null = Invoke-External 'cmd.exe' "/c `"$cmd`""
         Write-Ok 'Uninstaller finished.'
     }
 }
