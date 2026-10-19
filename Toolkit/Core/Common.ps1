@@ -234,6 +234,34 @@ function Invoke-External {
     $p.ExitCode
 }
 
+function Get-WingetPath {
+    <#
+        Full path to winget.exe, or $null if App Installer is genuinely absent.
+
+        winget is normally reached through a per-user App Execution Alias in
+        %LOCALAPPDATA%\Microsoft\WindowsApps. When a standard user elevates the toolkit
+        with a separate admin account - the usual helpdesk setup - the elevated process
+        runs as that admin, whose profile has no alias, so `Get-Command winget` fails and
+        winget looks uninstalled when it is not. The machine-wide App Installer package
+        under Program Files\WindowsApps is readable by administrators, so fall back to it.
+    #>
+    $cmd = Get-Command winget.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($cmd) { return $cmd.Source }
+
+    $root = Join-Path $env:ProgramFiles 'WindowsApps'
+    # Folder names carry the version and architecture, e.g.
+    #   Microsoft.DesktopAppInstaller_1.29.380.0_x64__8wekyb3d8bbwe
+    $packages = @(Get-ChildItem -LiteralPath $root -Directory -Filter 'Microsoft.DesktopAppInstaller_*__8wekyb3d8bbwe' -ErrorAction SilentlyContinue |
+        Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'winget.exe') })
+    if (-not $packages.Count) { return $null }
+
+    $newest = $packages | Sort-Object -Descending -Property @{ Expression = {
+        $v = ($_.Name -split '_')[1]
+        try { [version]$v } catch { [version]'0.0' }
+    } } | Select-Object -First 1
+    return (Join-Path $newest.FullName 'winget.exe')
+}
+
 function Select-FromList {
     param([object[]]$Items, [scriptblock]$Label, [string]$Prompt = 'Select')
     $Items = @($Items)
