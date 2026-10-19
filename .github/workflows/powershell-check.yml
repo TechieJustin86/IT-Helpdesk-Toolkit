@@ -99,12 +99,22 @@ jobs:
           # Fails the build on Error severity only. Warnings are listed for information:
           # this codebase uses Write-Host deliberately (Gui\GuiHost.ps1 overrides it to
           # redirect tool output into the window), so warning-level rules are noisy here.
+          #
+          # Excluded rules:
+          #   PSAvoidUsingWriteHost             - see above
+          #   PSAvoidUsingComputerNameHardcoded - the internet-reachability checks ping
+          #                                       1.1.1.1 on purpose. The rule guards against
+          #                                       leaking internal hostnames; a public resolver
+          #                                       is the opposite of sensitive.
           if (-not (Get-Module -ListAvailable PSScriptAnalyzer)) {
             Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -AllowClobber
           }
           Import-Module PSScriptAnalyzer
 
-          $results = Invoke-ScriptAnalyzer -Path . -Recurse -ExcludeRule PSAvoidUsingWriteHost
+          $results = Invoke-ScriptAnalyzer -Path . -Recurse -ExcludeRule @(
+            'PSAvoidUsingWriteHost',
+            'PSAvoidUsingComputerNameHardcoded'
+          )
 
           $errors   = @($results | Where-Object Severity -eq 'Error')
           $warnings = @($results | Where-Object Severity -eq 'Warning')
