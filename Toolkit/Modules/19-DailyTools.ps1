@@ -98,6 +98,20 @@ Add-Tool -Id 'DAILY-04' -Category 'Daily Utilities' -Name 'Generate device docum
 
     $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
 
+    # Get-BitLockerVolume needs admin. Without it the error was swallowed and the document
+    # said "Disabled" on encrypted PCs, so say what is known instead.
+    $bitLockerText = if (Test-IsAdmin) {
+        $v = Get-BitLockerVolume -MountPoint $env:SystemDrive -ErrorAction SilentlyContinue
+        if ($v) { "$($v.ProtectionStatus) on $env:SystemDrive ($($v.VolumeStatus))" } else { 'Not available' }
+    } else { 'Unknown - run as Administrator' }
+    # "Enabled" used to mean any one profile was on; report which ones
+    $fwProfiles = @(Get-NetFirewallProfile -ErrorAction SilentlyContinue)
+    $fwOn = @($fwProfiles | Where-Object Enabled | ForEach-Object Name)
+    $firewallText = if (-not $fwProfiles) { 'Unknown' }
+                    elseif ($fwOn.Count -eq $fwProfiles.Count) { 'Enabled (all profiles)' }
+                    elseif ($fwOn.Count) { "Partly enabled ($($fwOn -join ', ') only)" }
+                    else { 'Disabled' }
+
     $doc = @"
 ================================================================================
                        DEVICE DOCUMENTATION REPORT
@@ -145,8 +159,8 @@ $((Get-ItemProperty -Path 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Unins
 SECURITY STATUS
 ================================================================================
 Windows Defender: $(if ((Get-MpComputerStatus -ErrorAction SilentlyContinue).RealTimeProtectionEnabled) { 'Enabled' } else { 'Disabled' })
-Firewall: $(if ((Get-NetFirewallProfile | Where-Object { $_.Enabled }).Count -gt 0) { 'Enabled' } else { 'Disabled' })
-BitLocker: $(if ((Get-BitLockerVolume -ErrorAction SilentlyContinue).ProtectionStatus -eq 'On') { 'Enabled' } else { 'Disabled' })
+Firewall: $firewallText
+BitLocker: $bitLockerText
 
 ================================================================================
 "@
@@ -185,7 +199,7 @@ Add-Tool -Id 'DAILY-05' -Category 'Daily Utilities' -Name 'Remote desktop launch
 Add-Tool -Id 'DAILY-06' -Category 'Daily Utilities' -Name 'Send test email' -Description 'Verify email configuration: test SMTP server connectivity, port access, SSL - diagnoses email setup issues' -Action {
     Write-Section 'Email Connectivity Test'
 
-    $smtpServer = Read-Host '  SMTP Server (or leave for outlook.office365.com)'
+    $smtpServer = Read-Host '  SMTP Server (or leave for smtp.office365.com)'
     if (-not $smtpServer) { $smtpServer = 'smtp.office365.com' }
 
     $port = Read-Host '  Port (or leave for 587)'
