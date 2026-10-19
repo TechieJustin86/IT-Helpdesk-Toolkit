@@ -175,9 +175,9 @@ Add-Tool -Id 'SET-03' -Category 'Settings & Configuration' -Name 'About the tool
     Write-Host ''
 
     Write-Host 'Getting Started:' -ForegroundColor Cyan
-    Write-Host '  1. Read README.md for full documentation'
-    Write-Host '  2. Double-click Launch-GUI.bat to start (recommended)'
-    Write-Host '  3. Or run: .\Toolkit\HelpdeskToolkit.ps1 (console version)'
+    Write-Host '  1. Double-click Launch-GUI.bat in the Toolkit folder (recommended)'
+    Write-Host '  2. Or run .\HelpdeskToolkit.ps1 from the Toolkit folder (console version)'
+    Write-Host '  3. The Toolkit folder is self-contained: copy it to a flash drive to use it on any PC'
     Write-Host '  4. Browse categories and run tools'
     Write-Host ''
 

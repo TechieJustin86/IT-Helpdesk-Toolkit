@@ -83,7 +83,7 @@ This project adheres to the [Contributor Covenant Code of Conduct](CODE_OF_CONDU
 
 3. **GUI mode test**:
    ```powershell
-   .\Launch-GUI.bat
+   .\Toolkit\Launch-GUI.bat
    ```
 
 4. **Backward compatibility**: Ensure existing tools still work

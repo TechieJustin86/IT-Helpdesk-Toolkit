@@ -5,10 +5,10 @@
 ```
 Project Root/
 ├── README.md                    # Main guide
-├── Launch-GUI.bat              # Quick launcher
 ├── LICENSE                     # MIT License
 │
-├── Toolkit/
+├── Toolkit/                    # Self-contained: copy this folder to run anywhere
+│   ├── Launch-GUI.bat          # Quick launcher (elevates, then opens the GUI)
 │   ├── HelpdeskToolkit.ps1     # Console entry point
 │   ├── HelpdeskToolkit-GUI.ps1 # GUI entry point
 │   ├── Build-SingleFile.ps1    # Build standalone copies

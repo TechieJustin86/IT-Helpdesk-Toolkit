@@ -6,7 +6,9 @@ See [docs/CHANGELOG.md](docs/CHANGELOG.md) for what's new, [docs/GUIDE.md](docs/
 
 ## Start
 
-Double-click **`Launch-GUI.bat`**. It relaunches itself as Administrator, which some tools need, so Windows shows a UAC prompt. If you choose **No**, the toolkit opens as a standard user. Admin-only tools stay greyed out, and **Restart as Administrator** in the header lets you elevate later.
+Double-click **`Toolkit\Launch-GUI.bat`**. It relaunches itself as Administrator, which some tools need, so Windows shows a UAC prompt. If you choose **No**, the toolkit opens as a standard user. Admin-only tools stay greyed out, and **Restart as Administrator** in the header lets you elevate later.
+
+**The `Toolkit` folder is all you need.** Copy it to a flash drive and double-click `Launch-GUI.bat` inside it on any Windows 10/11 PC; nothing needs installing. See [Running from a flash drive](#running-from-a-flash-drive) for what is saved where.
 
 If you downloaded the files, unblock them once first:
 
@@ -29,19 +31,30 @@ The window has three columns: categories, tools (with search, `Ctrl+F`) and an o
 - **Dark mode:** use the toggle in the top-right corner, or press `Ctrl+D`. The first launch follows your Windows light/dark setting. After that, your choice is saved in the toolkit's `Settings\gui-settings.json` file, the same file as your favorites.
 - **Console version** (bottom right) opens the text-menu version of the same toolkit.
 
-Reports, CSV exports and a log of every action are saved to `Documents\HelpdeskToolkit`. Support cases go in `Documents\HelpdeskToolkit\Cases`, one text file per case.
+Your settings and the toolkit's logs are saved inside the `Toolkit` folder (`Settings\` and `Logs\`). Reports, CSV exports and usage statistics are saved to `Documents\HelpdeskToolkit` on the PC the toolkit is running on, and support cases go in `Documents\HelpdeskToolkit\Cases`, one text file per case.
+
+## Running from a flash drive
+
+Copy the `Toolkit` folder to the drive. On the PC, double-click `Launch-GUI.bat` inside it. Nothing is installed.
+
+- **Travels with the drive:** `Settings\` (favourites, theme, recent tools) and `Logs\` (action log, error log and audit trail).
+- **Stays on each PC:** reports, CSV exports and usage statistics, in `Documents\HelpdeskToolkit` of the account the toolkit runs as. If you elevate with a separate admin account, that is the admin's Documents folder, not the user's.
+- **The audit trail records the user and computer name for every tool run**, so the drive builds up a list of every PC it has been used on. Bear that in mind if the drive is lost or lent out.
+- **Updating the drive:** copy the `Toolkit` folder from an up-to-date copy over the one on the drive. Your settings and logs on the drive are kept, because a fresh copy has none to overwrite them with.
+- **Where it will not run:** PCs where Group Policy enforces a PowerShell execution policy (the launcher's `-ExecutionPolicy Bypass` cannot override one set by policy), where policy blocks running programs from removable drives, or where AppLocker or WDAC restricts scripts. Windows Server Core has no WPF, so only the console version (`HelpdeskToolkit.ps1`) works there.
 
 ## Folder layout
 
 ```
 README.md
-Launch-GUI.bat                     double-click to start (as Administrator)
-Toolkit\
+Toolkit\                           everything needed to run it - copy this folder to a flash drive
+  Launch-GUI.bat                   double-click to start (as Administrator)
   HelpdeskToolkit-GUI.ps1          GUI (WPF window)
   HelpdeskToolkit.ps1              console version; also supports -List / -Run <ID>
   Build-SingleFile.ps1             builds standalone single-file copies
-  Settings\                        GUI preferences and theme settings (portable)
-  Core\                            shared helpers, config, caching, error handling, console menu
+  Settings\                        GUI preferences and theme settings (travel with the folder)
+  Logs\                            action log, error log and audit trail (travel with the folder)
+  Core\                            shared helpers, config, dependency checks, validation, audit log, console menu
   Gui\GuiHost.ps1                  sends the tools' prompts and output to the GUI window
   Modules\                         one file per menu category (01-SystemInfo ... 24-Toolkit-Admin)
   Stand alone scripts\             independent tools that don't use the toolkit framework
@@ -66,7 +79,9 @@ Add-Tool -Id 'NET-16' -Category 'Network' -Name 'My tool' -Description 'What it 
 
 Output from `Write-Host`, `Write-Ok` and similar helpers, and from `... | Format-Table | Out-Host`, shows up in the GUI output pane. `Read-Host`, `Confirm-Action` and `Select-FromList` become dialogs automatically.
 
-## Single-file copies (USB stick / remote PCs)
+## Single-file copies (remote PCs)
+
+For a flash drive, use the whole `Toolkit` folder (see above): it has a double-click launcher. Single files suit the cases where you can only copy one or two files, such as dropping the toolkit onto a remote PC.
 
 ```powershell
 .\Toolkit\Build-SingleFile.ps1
@@ -76,7 +91,7 @@ This creates `Toolkit\dist\` with two standalone files that run anywhere on thei
 - `HelpdeskToolkit-GUI.ps1`
 - `HelpdeskToolkit.ps1` (console)
 
-Keep the two together so the GUI's **Console version** button works. The build syntax-checks every source file first and stops if one has an error. Rebuild after you edit a module. The `dist` folder is generated, so you can delete it at any time.
+There is no launcher, and double-clicking a `.ps1` in Explorer opens it in Notepad, so start them from PowerShell: `powershell -ExecutionPolicy Bypass -File .\HelpdeskToolkit-GUI.ps1`. The GUI offers to restart itself as Administrator. Keep the two together so the GUI's **Console version** button works. The build syntax-checks every source file first and stops if one has an error. Rebuild after you edit a module. The `dist` folder is generated, so you can delete it at any time.
 
 ## Command line (console version)
 
