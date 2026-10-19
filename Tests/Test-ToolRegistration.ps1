@@ -35,8 +35,7 @@ Write-Host '----------------------' -ForegroundColor DarkGray
 
 $Script:ModuleErrors = @()
 
-$coreOrder = @('Common.ps1', 'Config.ps1', 'Dependencies.ps1', 'Validation.ps1', 'Cache.ps1',
-               'ResourceManagement.ps1', 'ErrorHandling.ps1', 'SecurityManagement.ps1')
+$coreOrder = @('Common.ps1', 'Config.ps1', 'Dependencies.ps1', 'Validation.ps1', 'SecurityManagement.ps1')
 
 foreach ($file in $coreOrder) {
     $path = Join-Path $coreDir $file

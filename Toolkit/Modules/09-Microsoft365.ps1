@@ -59,6 +59,8 @@ Add-Tool -Id 'M365-02' -Category 'Microsoft 365' -Name 'Install Graph modules' -
             Write-Ok "$m installed."
         }
         Write-Log 'Microsoft Graph modules installed'
+        # Let the dependency gate re-check, so the M365 tools unlock without a restart
+        Clear-DependencyState -DependencyKey 'GraphPowerShell'
     } catch { Write-Err "Installation failed: $($_.Exception.Message)" }
 }
 

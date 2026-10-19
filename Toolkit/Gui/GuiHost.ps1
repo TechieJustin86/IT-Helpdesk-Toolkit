@@ -148,6 +148,13 @@ function Invoke-GuiTool {
         Write-Warn 'This tool requires Administrator rights. Use "Restart as Administrator" at the top of the window.'
         return
     }
+    $blocked = Get-UnmetToolDependency -ToolId $tool.Id
+    if ($blocked) {
+        Write-Warn "This tool needs the $($blocked.Module) module, which is not available."
+        Write-Info $blocked.InstallNote
+        Log-AuditEvent -Action $tool.Name -ToolId $tool.Id -Target $env:COMPUTERNAME -Status 'Blocked' -Details "Missing dependency: $($blocked.Module)"
+        return
+    }
     $Script:GuiRecent.Clear()
     $Script:CurrentTool = $tool
     Write-Log "RUN $($tool.Id) $($tool.Name) (GUI)"
@@ -161,14 +168,17 @@ function Invoke-GuiTool {
             elseif ($_ -is [System.Management.Automation.WarningRecord]) { Write-Warn $_.Message }
             else { $_ }
         } | Out-Host
+        Log-AuditEvent -Action $tool.Name -ToolId $tool.Id -Target $env:COMPUTERNAME -Status 'Success'
     } catch [System.OperationCanceledException] {
         # Cancel in an input dialog is not a failure: keep it out of the error log
         Write-Warn 'Cancelled.'
         Write-Log "CANCELLED $($tool.Id)"
+        Log-AuditEvent -Action $tool.Name -ToolId $tool.Id -Target $env:COMPUTERNAME -Status 'Cancelled'
     } catch {
         Write-Err $_.Exception.Message
         Write-ErrorLog -ToolId $tool.Id -ToolName $tool.Name -ErrorRecord $_
         Write-Log "ERROR $($tool.Id): $($_.Exception.Message)"
+        Log-AuditEvent -Action $tool.Name -ToolId $tool.Id -Target $env:COMPUTERNAME -Status 'Failed' -Details $_.Exception.Message
     }
     $Script:CurrentTool = $null
 }
