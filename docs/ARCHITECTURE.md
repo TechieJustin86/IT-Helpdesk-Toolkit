@@ -22,10 +22,10 @@ Project Root/
 │   │   └── Menu.ps1            # Console menu system
 │   │
 │   ├── Modules/                # Feature modules (loaded after Core)
-│   │   ├── 01-SystemInfo.ps1       # 14 system diagnostic tools
-│   │   ├── 02-Hardware.ps1         # 14 hardware tools
+│   │   ├── 01-SystemInfo.ps1       # 13 system diagnostic tools
+│   │   ├── 02-Hardware.ps1         # 13 hardware tools
 │   │   ├── 03-Network.ps1          # 31 network tools
-│   │   ├── 04-Maintenance.ps1      # 34 maintenance tools
+│   │   ├── 04-Maintenance.ps1      # 33 maintenance tools
 │   │   ├── 05-AppsOffice.ps1       # 13 apps/Office tools
 │   │   ├── 06-Security.ps1         # 20 security tools
 │   │   ├── 07-Users.ps1            # 12 user management tools
@@ -36,14 +36,14 @@ Project Root/
 │   │   ├── 13-Reports.ps1          # 10 reporting tools
 │   │   ├── 14-QuickLaunch.ps1      # 24 quick launcher tools
 │   │   ├── 15-AutoRepair.ps1       # 5 auto-repair tools
-│   │   ├── 16-Performance.ps1      # 6 performance tools
+│   │   ├── 16-Performance.ps1      # 5 performance tools
 │   │   ├── 17-BatchOps.ps1         # 6 batch operation tools
 │   │   ├── 18-Intune.ps1           # 5 Intune tools
-│   │   ├── 19-DailyTools.ps1       # 7 daily tools
+│   │   ├── 19-DailyTools.ps1       # 6 daily tools
 │   │   ├── 20-Analytics.ps1        # 3 analytics tools
-│   │   ├── 21-Developer.ps1        # 9 developer tools
-│   │   ├── 22-Settings.ps1         # 5 settings tools
-│   │   ├── 23-Recommendations.ps1  # 5 diagnostic tools
+│   │   ├── 21-Developer.ps1        # 7 developer tools
+│   │   ├── 22-Settings.ps1         # 4 settings tools
+│   │   ├── 23-Recommendations.ps1  # 4 diagnostic tools
 │   │   └── 24-Toolkit-Admin.ps1    # 6 admin tools
 │   │
 │   ├── Gui/
@@ -143,6 +143,24 @@ Add-Tool -Id 'NET-01' `
 - `Tags` - Optional tags for filtering
 - `Admin` - Flag if tool requires administrator
 - `Action` - ScriptBlock containing tool code
+- `Aliases` - Optional. Former IDs of tools merged into this one
+
+### Retiring a tool
+
+When two tools do the same job, merge the useful parts into one and list the other's ID
+in `-Aliases` instead of deleting it outright:
+
+```powershell
+Add-Tool -Id 'TRB-09' -Category 'Troubleshooting' -Name 'Disk health (SMART)' `
+    -Aliases @('HW-13') `
+    -Action { ... }
+```
+
+An alias keeps every way of reaching the old tool working: `-Run HW-13`, Run by ID in the
+console menu, saved GUI favourites and recents (rewritten to the current ID on load), and
+search. `Get-ToolById` and `Resolve-ToolId` in `Common.ps1` do the lookup. The
+registration test fails if an alias is malformed, matches a live ID, or is claimed by two
+tools.
 
 ## Logging and Diagnostics
 
@@ -159,7 +177,7 @@ record the same four things:
 Cancelling a prompt is recorded as `Cancelled`, not as a failure, so it stays out of the
 error log. A tool stopped by a missing optional module is recorded as `Blocked`.
 
-TKA-05 reports the audit trail, TKA-04 manages the error log, and REC-04 reports usage.
+TKA-05 reports the audit trail, TKA-04 manages the error log, and ANA-01 reports usage.
 
 These JSON files are arrays, and they must be read with `Get-JsonLogEntries` and written
 with `Add-JsonLogEntry` / `Set-JsonLogEntries` from `Common.ps1`. Windows PowerShell 5.1

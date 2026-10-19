@@ -11,7 +11,7 @@ Run any tool from the console with `-Run <ID>` (use `-List` to see every ID), or
 | Check system and toolkit health | `REC-05` |
 | Get optimization recommendations | `REC-02` |
 | Capture a performance baseline to compare later | `REC-03` |
-| See which tools I use most and their error rates | `REC-04` |
+| See which tools I use most and their error rates | `ANA-01` |
 | See runtime diagnostics for this session | `REC-01` |
 | View or change toolkit settings | `TKA-01` |
 | Verify toolkit files are present | `TKA-02` |
