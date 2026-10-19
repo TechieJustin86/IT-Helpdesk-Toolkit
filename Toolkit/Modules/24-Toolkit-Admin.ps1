@@ -23,34 +23,60 @@ Add-Tool -Id 'TKA-01' -Category 'Toolkit Administration' -Name 'Toolkit configur
     Write-Info 'To modify settings, contact your administrator or edit Core\Config.ps1'
 }
 
-Add-Tool -Id 'TKA-02' -Category 'Toolkit Administration' -Name 'Toolkit integrity check' -Description 'Verify toolkit files are present and not corrupted' -Tags @('maintenance','integrity') -Action {
+Add-Tool -Id 'TKA-02' -Category 'Toolkit Administration' -Name 'Toolkit integrity check' -Description 'Required files present, every script parses, modules loaded, and tools registered per category' -Tags @('maintenance','integrity') -Aliases @('SET-04', 'DEV-02') -Action {
+    # Merged from SET-04 "Verify toolkit integrity" and DEV-02 "Module diagnostics",
+    # which ran the same per-module syntax loop. Both counted tools by counting the text
+    # "Add-Tool" in each file, which reported 1 for 14-QuickLaunch (one Add-Tool in a
+    # loop that registers 24); the counts below come from the live registry instead.
     Write-Section 'Verifying Toolkit Integrity'
+    $problems = 0
 
-    $coreFiles = @('Common.ps1', 'Config.ps1', 'Dependencies.ps1', 'Validation.ps1', 'SecurityManagement.ps1', 'Menu.ps1')
-    $coreDir = Join-Path $Script:ToolkitDir 'Core'
-    $modulesDir = Join-Path $Script:ToolkitDir 'Modules'
+    Write-Section 'Required files'
+    $required = @(
+        'HelpdeskToolkit.ps1', 'HelpdeskToolkit-GUI.ps1', 'Gui\GuiHost.ps1',
+        'Core\Common.ps1', 'Core\Config.ps1', 'Core\Dependencies.ps1',
+        'Core\Validation.ps1', 'Core\SecurityManagement.ps1', 'Core\Menu.ps1'
+    )
+    foreach ($rel in $required) {
+        if (Test-Path -LiteralPath (Join-Path $Script:ToolkitDir $rel)) { Write-Check 'OK' $rel 'Found' }
+        else { Write-Check 'FAIL' $rel 'Missing'; $problems++ }
+    }
+    $moduleFiles = @(Get-ChildItem -Path (Join-Path $Script:ToolkitDir 'Modules') -Filter *.ps1 -ErrorAction SilentlyContinue)
+    Write-Check 'INFO' 'Modules folder' "$($moduleFiles.Count) module files"
 
-    $missing = @()
-    foreach ($file in $coreFiles) {
-        $path = Join-Path $coreDir $file
-        if (-not (Test-Path $path)) {
-            $missing += $file
-            Write-Err "Missing: Core\$file"
-        } else {
-            Write-Ok "Found: Core\$file"
+    Write-Section 'Syntax'
+    $scripts = @(Get-ChildItem -Path $Script:ToolkitDir -Filter *.ps1 -Recurse -ErrorAction SilentlyContinue | Sort-Object FullName)
+    $syntaxErrors = 0
+    foreach ($file in $scripts) {
+        $tokenErrors = $null
+        $null = [System.Management.Automation.PSParser]::Tokenize((Get-Content -LiteralPath $file.FullName -Raw), [ref]$tokenErrors)
+        if ($tokenErrors.Count) {
+            $syntaxErrors++
+            Write-Check 'FAIL' $file.Name "$($tokenErrors[0].Message) (line $($tokenErrors[0].Token.StartLine))"
         }
     }
+    if ($syntaxErrors) { $problems += $syntaxErrors }
+    else { Write-Check 'OK' 'Scripts parsed' "$($scripts.Count) files, no syntax errors" }
 
-    $moduleCount = @(Get-ChildItem $modulesDir -Filter *.ps1).Count
-    Write-Ok "Modules: $moduleCount files found"
-
-    if ($missing.Count -eq 0) {
-        Write-Section 'Result'
-        Write-Ok 'Integrity check PASSED - all files present'
+    Write-Section 'Loading'
+    $loadErrors = @($Script:ModuleErrors | Where-Object { $_ })
+    if ($loadErrors.Count) {
+        foreach ($e in $loadErrors) { Write-Check 'FAIL' 'Module' $e }
+        $problems += $loadErrors.Count
     } else {
-        Write-Section 'Result'
-        Write-Err "Integrity check FAILED - $($missing.Count) file(s) missing"
-        Write-Warn 'Restore from backup or reinstall the toolkit'
+        Write-Check 'OK' 'Modules' 'All loaded without errors'
+    }
+
+    Write-Section 'Registered tools'
+    $Script:Tools | Group-Object Category | Sort-Object Name | ForEach-Object { Write-Check 'INFO' $_.Name "$($_.Count) tools" }
+    Write-Check 'INFO' 'Total' "$($Script:Tools.Count) tools"
+
+    Write-Section 'Result'
+    if ($problems) {
+        Write-Err "Integrity check FAILED - $problems problem(s) found"
+        Write-Warn 'Restore from backup or re-download the toolkit'
+    } else {
+        Write-Ok 'Integrity check PASSED'
     }
 }
 
@@ -103,7 +129,9 @@ Add-Tool -Id 'TKA-03' -Category 'Toolkit Administration' -Name 'Toolkit diagnost
     Write-Check 'INFO' 'System Memory Used' "$($mem.MemoryUtilizationPercent)%"
 }
 
-Add-Tool -Id 'TKA-04' -Category 'Toolkit Administration' -Name 'Clear error log' -Description 'Remove old error logs to free space' -Tags @('maintenance','cleanup') -Action {
+Add-Tool -Id 'TKA-04' -Category 'Toolkit Administration' -Name 'Clear error log' -Description 'Remove error log entries older than 30 days, or clear the whole log' -Tags @('maintenance','cleanup') -Aliases @('DEV-08') -Action {
+    # Merged from DEV-08 "Clear error log" (Developer & Debugging), which only offered
+    # clearing everything; that is option 2 here.
     Write-Section 'Error Log Management'
 
     if (-not (Test-Path $Script:ErrorLogFile)) {
@@ -117,12 +145,27 @@ Add-Tool -Id 'TKA-04' -Category 'Toolkit Administration' -Name 'Clear error log'
     $oldDate = (Get-Date).AddDays(-30)
     $toDelete = @($errors | Where-Object { [datetime]$_.Timestamp -lt $oldDate })
 
+    Write-Host "  [1] Remove entries older than 30 days ($($toDelete.Count) of $($errors.Count))"
+    Write-Host '  [2] Clear the whole error log'
+    $c = Read-Host '  Choice'
+
+    if ($c -eq '2') {
+        if (-not (Confirm-Action "Delete all $($errors.Count) error log entries?")) { return }
+        try {
+            Remove-Item -LiteralPath $Script:ErrorLogFile -Force -ErrorAction Stop
+            Write-Ok 'Error log cleared'
+        } catch {
+            Write-Err "Failed to clear error log: $($_.Exception.Message)"
+        }
+        return
+    }
+    if ($c -ne '1') { return }
+
     if ($toDelete.Count -eq 0) {
         Write-Ok 'No errors older than 30 days to clear'
         return
     }
 
-    Write-Warn "Found $($toDelete.Count) errors older than 30 days"
     if (Confirm-Action "Delete $($toDelete.Count) old error entries?") {
         $keep = @($errors | Where-Object { [datetime]$_.Timestamp -ge $oldDate })
 

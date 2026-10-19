@@ -97,30 +97,6 @@ Add-Tool -Id 'PERF-03' -Category 'Performance & Optimization' -Name 'Find memory
     }
 }
 
-Add-Tool -Id 'PERF-04' -Category 'Performance & Optimization' -Name 'Disk defragmentation' -Description 'Smart drive optimization: auto-detects SSD vs HDD, runs TRIM for SSDs or defragmentation for hard drives' -Admin -Action {
-    Write-Section 'Disk Optimization'
-
-    Write-Info 'Analyzing drives...'
-    $volumes = Get-Volume | Where-Object { $_.DriveType -eq 'Fixed' }
-
-    foreach ($vol in $volumes) {
-        if ($vol.DriveLetter) {
-            Write-Info "Drive $($vol.DriveLetter): "
-
-            $isSSD = (Get-PhysicalDisk -ErrorAction SilentlyContinue | Where-Object { $_.MediaType -eq 'SSD' })
-
-            if ($isSSD) {
-                Write-Ok "SSD detected - running TRIM (safe for SSDs)"
-                Optimize-Volume -DriveLetter $vol.DriveLetter -TrimOnly -ErrorAction SilentlyContinue
-            } else {
-                Write-Info "HDD detected - defragmenting (may take time)..."
-                Optimize-Volume -DriveLetter $vol.DriveLetter -Defrag -ErrorAction SilentlyContinue
-            }
-            Write-Ok "Optimization complete"
-        }
-    }
-}
-
 Add-Tool -Id 'PERF-05' -Category 'Performance & Optimization' -Name 'Boot time analyzer' -Description 'Diagnose startup delays: count startup programs & auto-start services, measure uptime, identify optimization targets' -Admin -Action {
     Write-Section 'Boot Performance Analysis'
 
