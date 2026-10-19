@@ -1,4 +1,4 @@
-# Modules\02-Hardware.ps1
+﻿# Modules\02-Hardware.ps1
 # Category: Hardware & Peripherals
 # Loaded by HelpdeskToolkit.ps1 (dot-sourced). Do not run directly.
 # Converted from modulesV2: PeripheralDiagnostics, BatteryHealth, HardwareInventory.

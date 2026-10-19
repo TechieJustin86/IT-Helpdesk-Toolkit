@@ -1,4 +1,4 @@
-# Modules\21-Settings.ps1
+﻿# Modules\21-Settings.ps1
 # Category: Settings & Configuration
 # Loaded by HelpdeskToolkit.ps1 (dot-sourced). Do not run directly.
 

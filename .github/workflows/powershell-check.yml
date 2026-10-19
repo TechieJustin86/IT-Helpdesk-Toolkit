@@ -72,20 +72,33 @@ jobs:
       - name: Check file encoding
         shell: powershell
         run: |
+          # Windows PowerShell 5.1 reads a .ps1 with no BOM as the ANSI code page
+          # (Windows-1252), so any non-ASCII character in a BOM-less file is shown
+          # garbled: a UTF-8 degree sign becomes "Â°", a box-drawing line "â”€".
+          # A file that is pure ASCII needs no BOM; one with any other character does.
           Write-Host "Checking file encoding..." -ForegroundColor Cyan
-          $files = Get-ChildItem -Recurse -Filter "*.ps1"
           $issues = 0
 
-          foreach ($file in $files) {
+          foreach ($file in Get-ChildItem -Recurse -Filter "*.ps1") {
             $bytes = [System.IO.File]::ReadAllBytes($file.FullName)
-            if ($bytes.Length -gt 3) {
-              $bom = $bytes[0..3]
-              if ($bom[0] -eq 0xEF -and $bom[1] -eq 0xBB -and $bom[2] -eq 0xBF) {
-                # UTF-8 BOM (OK)
-              } elseif ($bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE) {
-                # UTF-16 LE (OK)
-              }
+            $utf8Bom  = $bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF
+            $utf16Bom = $bytes.Length -ge 2 -and $bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE
+            if ($utf8Bom -or $utf16Bom) { continue }
+
+            $firstNonAscii = -1
+            for ($i = 0; $i -lt $bytes.Length; $i++) { if ($bytes[$i] -ge 0x80) { $firstNonAscii = $i; break } }
+            if ($firstNonAscii -ge 0) {
+              $line = ([System.Text.Encoding]::ASCII.GetString($bytes, 0, $firstNonAscii) -split "`n").Count
+              Write-Host "[FAIL] $($file.Name): non-ASCII text without a UTF-8 BOM (first at line $line)" -ForegroundColor Red
+              $issues++
             }
+          }
+
+          if ($issues) {
+            Write-Host ""
+            Write-Host "[FAIL] $issues file(s) will display garbled text in Windows PowerShell 5.1." -ForegroundColor Red
+            Write-Host "       Save them as 'UTF-8 with BOM'." -ForegroundColor Red
+            exit 1
           }
           Write-Host "[OK] File encoding check passed" -ForegroundColor Green
 

@@ -1,4 +1,4 @@
-# Modules\20-Analytics.ps1
+﻿# Modules\20-Analytics.ps1
 # Category: Analytics & Shortcuts
 # Loaded by HelpdeskToolkit.ps1 (dot-sourced). Do not run directly.
 
