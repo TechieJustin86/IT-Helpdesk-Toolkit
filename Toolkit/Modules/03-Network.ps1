@@ -45,7 +45,7 @@ Add-Tool -Id 'NET-04' -Category 'Network' -Name 'Reset network stack' -Admin -De
     ipconfig /flushdns | Out-Null
     netsh interface ip delete arpcache | Out-Null
     Write-Ok 'Network stack reset.'
-    if (Confirm-Action 'Reboot now?') { Restart-Computer -Force }
+    if (Confirm-DestructiveAction -Action 'Restart now - all open apps will close and unsaved work will be lost' -Target $env:COMPUTERNAME) { Restart-Computer -Force }
 }
 
 Add-Tool -Id 'NET-05' -Category 'Network' -Name 'Public IP and ISP' -Description 'Show external IP address, ISP and location' -Action {

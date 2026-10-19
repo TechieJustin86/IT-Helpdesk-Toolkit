@@ -22,7 +22,7 @@ Add-Tool -Id 'MNT-01' -Category 'Maintenance & Repair' -Name 'Clean temporary fi
 }
 
 Add-Tool -Id 'MNT-02' -Category 'Maintenance & Repair' -Name 'Empty Recycle Bin' -Description 'Empty the Recycle Bin on all drives' -Action {
-    if (Confirm-Action 'Permanently empty the Recycle Bin?') { Clear-RecycleBin -Force -ErrorAction SilentlyContinue; Write-Ok 'Recycle Bin emptied.' }
+    if (Confirm-DestructiveAction -Action 'Permanently empty the Recycle Bin - deleted files cannot be recovered' -Target 'all drives') { Clear-RecycleBin -Force -ErrorAction SilentlyContinue; Write-Ok 'Recycle Bin emptied.' }
 }
 
 Add-Tool -Id 'MNT-03' -Category 'Maintenance & Repair' -Name 'System File Checker (SFC)' -Admin -Description 'Scan and repair protected Windows files' -Action {
@@ -544,7 +544,7 @@ Add-Tool -Id 'MNT-27' -Category 'Maintenance & Repair' -Name 'Rename PC' -Admin 
         Rename-Computer -NewName $newName -Force -ErrorAction Stop
         Write-Ok "PC renamed to '$newName'. You must restart for changes to take effect."
         Write-Info "Restart this PC to complete the change."
-        if (Confirm-Action 'Restart now?') {
+        if (Confirm-DestructiveAction -Action 'Restart now - all open apps will close and unsaved work will be lost' -Target $env:COMPUTERNAME) {
             Write-Info 'Restarting...'
             Start-Sleep -Seconds 2
             Restart-Computer -Force

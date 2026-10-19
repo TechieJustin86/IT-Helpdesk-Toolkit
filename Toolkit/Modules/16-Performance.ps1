@@ -88,7 +88,7 @@ Add-Tool -Id 'PERF-03' -Category 'Performance & Optimization' -Name 'Find memory
         $suspect = $processes | Select-Object -First 1
         Write-Warn "Top suspect: $($suspect.Name) ($(Format-Bytes $suspect.WorkingSet))"
 
-        if (Confirm-Action "Kill $($suspect.Name)?") {
+        if (Confirm-DestructiveAction -Action "End $($suspect.Name) - unsaved work will be lost" -Target $env:COMPUTERNAME) {
             Stop-Process -Id $suspect.Id -Force -ErrorAction SilentlyContinue
             Write-Ok "Terminated $($suspect.Name)"
         }

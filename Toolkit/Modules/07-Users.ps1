@@ -13,7 +13,7 @@ Add-Tool -Id 'USR-02' -Category 'Users & Accounts' -Name 'Logged-on sessions' -D
         $out | Out-Host
         if ((Test-IsAdmin) -and (Confirm-Action 'Log off a session?')) {
             $id = Read-Host '  Session ID'
-            if ($id -match '^\d+$' -and (Confirm-Action "Log off session $id? Unsaved work will be lost.")) { logoff $id; Write-Ok 'Logged off.' }
+            if ($id -match '^\d+$' -and (Confirm-DestructiveAction -Action "Log off session $id - unsaved work will be lost" -Target $env:COMPUTERNAME)) { logoff $id; Write-Ok 'Logged off.' }
         }
     } else {
         Get-CimInstance Win32_Process -Filter "Name='explorer.exe'" | ForEach-Object {

@@ -144,7 +144,7 @@ Add-Tool -Id 'APP-10' -Category 'Apps & Office' -Name 'Credential Manager cleanu
     elseif ($c -eq '2') { $t = Select-FromList $targets { $_ } 'Credential'; if ($t) { $remove = @($t) } }
     if (-not $remove.Count) { return }
     $remove | ForEach-Object { Write-Host "    $_" -ForegroundColor Yellow }
-    if (Confirm-Action "Remove $($remove.Count) credential(s)?") {
+    if (Confirm-DestructiveAction -Action "Remove $($remove.Count) saved credential(s)" -Target 'Windows Credential Manager') {
         foreach ($t in $remove) { cmdkey "/delete:$t" | Out-Null }
         Write-Ok 'Removed. Restart Office apps and sign in again.'
     }
