@@ -122,56 +122,41 @@ Add-Tool -Id 'SET-02' -Category 'Settings & Configuration' -Name 'Recommendation
     Write-Info 'Items marked COMPLETED are already implemented.'
 }
 
-Add-Tool -Id 'SET-03' -Category 'Settings & Configuration' -Name 'About the toolkit' -Description 'Version information, changelog, system requirements, and compatibility details' -Action {
+Add-Tool -Id 'SET-03' -Category 'Settings & Configuration' -Name 'About the toolkit' -Description 'Version, requirements, known limitations and where to get help' -Action {
+    # Counts and version are read live, so this screen cannot drift from the code again.
+    # (It used to list fictional "v1.9 to v2.0" changes, "211 to 228 tools", Windows 7
+    # support the toolkit has never had, and Intune modules the Intune tools do not use.)
     Write-Section 'About IT Helpdesk Toolkit'
 
     Write-Host ''
     Write-Host "Version: $Script:Version" -ForegroundColor Cyan
-    Write-Host 'Released: 2026-09-29' -ForegroundColor Cyan
-    Write-Host 'Status: Production Ready ✓' -ForegroundColor Green
+    Write-Host '  Changes since this version are listed under "Unreleased" in docs\CHANGELOG.md'
     Write-Host ''
 
     Write-Host 'What is this?'
-    Write-Host "  Comprehensive Windows IT support toolkit with $($Script:Tools.Count) tools across $(@($Script:Tools | ForEach-Object Category | Select-Object -Unique).Count) categories"
-    Write-Host '  Includes system diagnostics, maintenance, security, network tools, and more'
-    Write-Host '  Works on any Windows machine without additional software installation'
+    Write-Host "  Windows IT support toolkit with $($Script:Tools.Count) tools across $(@($Script:Tools | ForEach-Object Category | Select-Object -Unique).Count) categories"
+    Write-Host '  Diagnostics, maintenance, security, network, users, remote PCs, reports and more'
+    Write-Host '  Core tools need nothing installed, and the Toolkit folder runs as-is from a flash drive'
     Write-Host ''
 
     Write-Host 'System Requirements:' -ForegroundColor Cyan
-    Write-Host '  • Windows 7 or later (7, 8, 8.1, 10, 11, Server editions)'
-    Write-Host '  • PowerShell 5.1 (built-in) or PowerShell 7+ (optional, newer features)'
-    Write-Host '  • Administrator rights for sensitive operations'
-    Write-Host '  • No external dependencies for core tools'
+    Write-Host '  • Windows 10 or 11'
+    Write-Host '  • Windows PowerShell 5.1 (built in) or PowerShell 7'
+    Write-Host '  • The GUI needs WPF, which Windows Server Core does not have (the console version works there)'
+    Write-Host '  • Administrator rights for the tools marked admin'
     Write-Host ''
 
     Write-Host 'Optional Requirements:' -ForegroundColor Cyan
-    Write-Host '  • Active Directory module (for AD tools) - installed on-demand'
-    Write-Host '  • Microsoft Graph PowerShell modules (for M365 tools) - installed on-demand'
-    Write-Host '  • Intune PowerShell modules (for Intune tools) - installed on-demand'
-    Write-Host ''
-
-    Write-Host 'Recent Changes (v1.9 to v2.0):' -ForegroundColor Cyan
-    Write-Host '  ✓ Fixed character encoding corruption in 3 critical modules'
-    Write-Host '  ✓ Fixed $PSScriptRoot resolution in Developer tools'
-    Write-Host '  ✓ Added comprehensive error logging system'
-    Write-Host '  ✓ Expanded from 211 to 228 tools'
-    Write-Host '  ✓ Added 6 new categories (AutoRepair, Performance, Batch, Intune, Daily, Settings)'
-    Write-Host '  ✓ Improved module diagnostics and developer tools'
-    Write-Host '  ✓ Created complete testing framework for bare-bones machines'
-    Write-Host ''
-
-    Write-Host 'Tested On:' -ForegroundColor Cyan
-    Write-Host '  • Windows 11 Home (bare-bones, no domain, no Office)'
-    Write-Host '  • Windows 10 Pro/Enterprise'
-    Write-Host '  • Windows Server 2016/2019/2022'
-    Write-Host '  • PowerShell 5.1 and PowerShell 7.x'
+    Write-Host '  • RSAT ActiveDirectory module, for the Active Directory tools - AD-02 installs it'
+    Write-Host '  • Microsoft Graph PowerShell modules, for the Microsoft 365 tools - M365-02 installs them'
+    Write-Host '  • winget (App Installer), for APP-02 and APP-11'
     Write-Host ''
 
     Write-Host 'Known Limitations:' -ForegroundColor Cyan
-    Write-Host '  • Active Directory tools require domain membership'
-    Write-Host '  • Microsoft 365 tools require Office/Microsoft 365 subscription'
-    Write-Host '  • Some security tools require Administrator privileges'
-    Write-Host '  • Network diagnostic tools may timeout on very slow connections'
+    Write-Host '  • Active Directory tools need a domain, and AD permissions for changes'
+    Write-Host '  • Microsoft 365 tools need a Microsoft 365 tenant and an account allowed to read it'
+    Write-Host '  • Without Administrator rights some tools can see less (BitLocker, TPM details, some logs)'
+    Write-Host '  • Network diagnostic tools may time out on very slow connections'
     Write-Host ''
 
     Write-Host 'Getting Started:' -ForegroundColor Cyan
