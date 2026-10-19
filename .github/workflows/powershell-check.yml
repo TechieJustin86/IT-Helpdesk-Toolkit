@@ -1,12 +1,13 @@
-name: PowerShell Syntax Check
+name: PowerShell Checks
 
 on:
   push:
     branches: [ master, develop ]
-    paths: [ '**.ps1' ]
+    # README.md is included because the tool-registration test checks the counts it advertises
+    paths: [ '**.ps1', 'README.md', '.github/workflows/powershell-check.yml' ]
   pull_request:
     branches: [ master, develop ]
-    paths: [ '**.ps1' ]
+    paths: [ '**.ps1', 'README.md', '.github/workflows/powershell-check.yml' ]
 
 jobs:
   syntax-check:
@@ -87,3 +88,44 @@ jobs:
             }
           }
           Write-Host "[OK] File encoding check passed" -ForegroundColor Green
+
+      - name: Tool registration
+        shell: powershell
+        run: .\Tests\Test-ToolRegistration.ps1
+
+      - name: PSScriptAnalyzer
+        shell: powershell
+        run: |
+          # Fails the build on Error severity only. Warnings are listed for information:
+          # this codebase uses Write-Host deliberately (Gui\GuiHost.ps1 overrides it to
+          # redirect tool output into the window), so warning-level rules are noisy here.
+          if (-not (Get-Module -ListAvailable PSScriptAnalyzer)) {
+            Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -AllowClobber
+          }
+          Import-Module PSScriptAnalyzer
+
+          $results = Invoke-ScriptAnalyzer -Path . -Recurse -ExcludeRule PSAvoidUsingWriteHost
+
+          $errors   = @($results | Where-Object Severity -eq 'Error')
+          $warnings = @($results | Where-Object Severity -eq 'Warning')
+
+          if ($warnings.Count) {
+            Write-Host ""
+            Write-Host "Warnings ($($warnings.Count)) - not failing the build:" -ForegroundColor Yellow
+            $warnings | Group-Object RuleName | Sort-Object Count -Descending |
+              ForEach-Object { Write-Host ("  {0,4}  {1}" -f $_.Count, $_.Name) }
+          }
+
+          if ($errors.Count) {
+            Write-Host ""
+            Write-Host "Errors ($($errors.Count)):" -ForegroundColor Red
+            $errors | ForEach-Object {
+              Write-Host ("  {0}:{1}  [{2}] {3}" -f $_.ScriptName, $_.Line, $_.RuleName, $_.Message) -ForegroundColor Yellow
+            }
+            Write-Host ""
+            Write-Host "[FAIL] PSScriptAnalyzer found errors" -ForegroundColor Red
+            exit 1
+          }
+
+          Write-Host ""
+          Write-Host "[OK] No PSScriptAnalyzer errors" -ForegroundColor Green
