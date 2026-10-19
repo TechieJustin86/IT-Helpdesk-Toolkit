@@ -142,7 +142,7 @@ function Invoke-External {
 
 function Invoke-GuiTool {
     param([string]$Id)
-    $tool = $Script:Tools | Where-Object Id -eq $Id | Select-Object -First 1
+    $tool = Get-ToolById $Id
     if (-not $tool) { Write-Err "Unknown tool '$Id'."; return }
     if ($tool.Admin -and -not (Test-IsAdmin)) {
         Write-Warn 'This tool requires Administrator rights. Use "Restart as Administrator" at the top of the window.'
