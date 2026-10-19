@@ -3,10 +3,9 @@
 # Global - all files by default
 * @TechieJustin86
 
-# Core modules - critical security/performance components
+# Core modules - shared by every tool
 Toolkit/Core/ @TechieJustin86
 Toolkit/Core/SecurityManagement.ps1 @TechieJustin86
-Toolkit/Core/ErrorHandling.ps1 @TechieJustin86
 
 # Documentation - keep docs current
 docs/ @TechieJustin86

@@ -11,68 +11,71 @@ This project adheres to the [Contributor Covenant Code of Conduct](CODE_OF_CONDU
 1. **Fork the repository** on GitHub
 2. **Clone your fork** locally:
    ```powershell
-   git clone https://github.com/your-username/Git_PS_IT_Helpdesk_Toolkit.git
-   cd Git_PS_IT_Helpdesk_Toolkit
+   git clone https://github.com/<your-username>/IT-Helpdesk-Toolkit.git
+   cd IT-Helpdesk-Toolkit
    ```
 3. **Create a feature branch**:
    ```powershell
    git checkout -b feature/your-feature-name
    ```
 
+## This repository is public
+
+Everything you commit is visible to everyone, and git history is permanent: a secret that reaches a commit cannot be fully removed by deleting it later. Before every commit, check your changes contain none of these:
+
+- Passwords, API keys, tokens, connection strings, or certificate and key files (`.pfx`, `.pem`, `.key`)
+- Real domain names, server names, internal hostnames, UNC paths to real servers, or internal IP ranges. Placeholders such as `fileserver`, `domain.local` and `192.168.1.0/24` are fine.
+- Real names, usernames, email addresses or machine names
+- Anything from an employer: internal tool names, company names, ticket data, logs, exports, inventories
+- Generated or machine-specific files: settings JSON, logs, reports, CSV exports. `.gitignore` already excludes the toolkit's own.
+
 ## Development Guidelines
 
 ### Adding a New Tool
 
-1. **Identify the right module** in `Toolkit/Modules/` or create a new one following the naming convention (e.g., `NN-CategoryName.ps1`)
+1. **Pick the module** in `Toolkit/Modules/` for its category, or create a new one named `NN-CategoryName.ps1`.
 
-2. **Use the `Add-Tool` helper**:
+2. **Register it with `Add-Tool`**:
    ```powershell
-   Add-Tool -Id 'CAT-##' `
-       -Category 'Category Name' `
+   Add-Tool -Id 'CUS-01' `
+       -Category 'Custom' `
        -Name 'Tool Display Name' `
        -Description 'Brief description of what the tool does' `
        -Tags @('tag1', 'tag2') `
-       -Admin `  # Include if tool requires administrator
+       -Admin `
        -Action {
+           Write-Info 'Checking...'
            # Your PowerShell code here
-           Write-Ok "Tool executed successfully"
+           Write-Ok 'Done'
        }
    ```
+   Leave out `-Admin` if the tool works without Administrator rights.
 
-3. **Follow naming conventions**:
-   - Tool ID: `CAT-##` (3-letter category abbreviation + 2-digit number)
-   - IDs should be sequential within each category
-   - See `README.md` for existing categories and numbering
+3. **Choose an unused ID** in the form `PREFIX-NN`: letters or digits, a hyphen, then a number, such as `NET-32` or `HW-15`. Use the prefix the category already uses. Never reuse the ID of a retired tool, because it is an alias for the tool that replaced it (see `docs/ARCHITECTURE.md`, "Retiring a tool"). The registration test rejects duplicates.
 
-4. **Input validation**:
-   - Always validate user input using functions from `Validation.ps1`
-   - Example: `Validate-ComputerNameInput -ComputerName $name`
+4. **Output and prompts** - use the toolkit helpers so the tool works in both the GUI and the console:
+   - `Write-Ok`, `Write-Info`, `Write-Warn`, `Write-Err`, `Write-Section`, `Write-Check`
+   - `Format-Table | Out-Host` for tables
+   - `Read-Host`, `Confirm-Action` and `Select-FromList` for questions; they become dialogs in the GUI
+   - `Confirm-DestructiveAction` for anything that cannot be undone, so the user has to type `yes`
+   - Treat a blank answer or "no" as "do nothing". In the GUI, Cancel stops the tool.
 
-5. **Error handling**:
-   - Use `Invoke-ToolSafe` wrapper for safe execution
-   - Include `Invoke-ToolWithRetry` for flaky operations
-   - Log errors with full context using `Write-ErrorLog`
-
-6. **Output formatting**:
-   - Use `Write-Ok`, `Write-Warning`, `Write-Error` for consistent UI
-   - Use `Format-Table | Out-Host` for tabular output
-   - Output appears in both GUI and console
+5. **Errors** - the tool runner already logs every run, records failures with full context, and writes the audit trail. Let failures you want reported reach it, for example with `-ErrorAction Stop`.
 
 ### Code Standards
 
-- **PowerShell Version**: Support PS 5.1 and PS 7+
-- **Admin Checks**: Use `Test-IsAdmin` to conditionally mark tools
-- **Logging**: Use `Write-Log` for all operations
-- **Error Context**: Include stack traces and context in error logs
-- **Performance**: Use caching for expensive operations
-- **Security**: Never log passwords or sensitive data
-- **Documentation**: Add comment explaining non-obvious logic
+- **PowerShell version**: support Windows PowerShell 5.1 and PowerShell 7.
+- **File encoding**: if a script contains any non-ASCII character (`°`, `•`, `✓`, box-drawing lines), save it as **UTF-8 with BOM**. Windows PowerShell 5.1 reads a file without a BOM as Windows-1252 and shows garbled text. CI checks this.
+- **Standard users**: don't let `-ErrorAction SilentlyContinue` turn "access denied" into a negative result. Some Windows interfaces answer only administrators, so a hidden failure reads as "not installed" or "not enabled". If a result needs elevation, check `Test-IsAdmin` and say so. `docs/ARCHITECTURE.md` lists known cases.
+- **The toolkit's JSON logs**: read them with `Get-JsonLogEntries`, and write them with `Add-JsonLogEntry` or `Set-JsonLogEntries`. Never use `@(Get-Content ... | ConvertFrom-Json)`, which Windows PowerShell 5.1 turns into a nested array.
+- **Security**: never log passwords or other secrets. Nothing in the toolkit's logs is masked.
+- **Documentation**: add a comment explaining non-obvious logic, especially a workaround.
 
 ### Testing Your Changes
 
-1. **Syntax validation**: PowerShell syntax checker validates all files
+1. **Registration test** - loads every module and checks IDs, aliases and the README counts:
    ```powershell
-   .\Toolkit\Build-SingleFile.ps1
+   .\Tests\Test-ToolRegistration.ps1
    ```
 
 2. **Console mode test**:
@@ -86,7 +89,9 @@ This project adheres to the [Contributor Covenant Code of Conduct](CODE_OF_CONDU
    .\Toolkit\Launch-GUI.bat
    ```
 
-4. **Backward compatibility**: Ensure existing tools still work
+4. **Standard user and Administrator** - if the tool reads system state, try it both elevated and not, and make sure neither gives a wrong answer.
+
+The same checks run in CI on every pull request that changes a `.ps1` file or `README.md`: syntax, file encoding, the registration test, and PSScriptAnalyzer.
 
 ## Making Changes
 
@@ -96,23 +101,23 @@ This project adheres to the [Contributor Covenant Code of Conduct](CODE_OF_CONDU
 
 ### Commit Messages
 
-Write clear, descriptive commit messages:
+Write clear, descriptive commit messages. This repository uses a type prefix:
+
 ```
-Brief summary of changes (50 chars or less)
+fix: short summary of the change (50 chars or less)
 
 Detailed explanation of what changed and why. Reference any related
 issues using #issue-number format.
-
-- Specific change 1
-- Specific change 2
 ```
+
+Common types: `feat`, `fix`, `docs`, `refactor`, `ci`.
 
 ### Documentation
 
-Update relevant docs when making changes:
-- **New tool?** → Update the `README.md` tools table and counts
-- **Any user-visible change?** → Add to `docs/CHANGELOG.md`
-- **Config, logging or troubleshooting change?** → Update `docs/GUIDE.md`
+Update the relevant docs when making changes:
+- **New, merged or removed tool?** → Update the `README.md` tools table and counts. The registration test fails until the counts match.
+- **Any user-visible change?** → Add it under "Unreleased" in `docs/CHANGELOG.md`
+- **Storage, logging or troubleshooting change?** → Update `docs/GUIDE.md`
 - **New module or core file?** → Update `docs/ARCHITECTURE.md`
 
 ## Submitting Changes
@@ -134,23 +139,22 @@ Update relevant docs when making changes:
 
 All submissions will be reviewed for:
 - ✅ Code quality and consistency
-- ✅ Backward compatibility
-- ✅ Performance impact
-- ✅ Security implications
+- ✅ Correct results both elevated and as a standard user
+- ✅ Backward compatibility, including tool IDs
+- ✅ Security implications and the public-repository checklist above
 - ✅ Documentation completeness
-- ✅ Test coverage
 
 ## Reporting Issues
 
 Use GitHub Issues to report bugs or suggest features:
 
-1. **Check if issue already exists** (search closed issues too)
+1. **Check if the issue already exists** (search closed issues too)
 2. **Include reproduction steps** if it's a bug
 3. **Include your environment**:
-   - Windows version (e.g., Windows 11 22H2)
+   - Windows version (e.g., Windows 11 23H2)
    - PowerShell version (5.1 or 7.x)
-   - Toolkit version
-   - Any error logs
+   - Whether the toolkit was running elevated
+   - The relevant entries from `Toolkit\Logs\toolkit-errors.json`, with any personal details removed
 
 ## Security Issues
 
@@ -162,15 +166,18 @@ Instead, follow the reporting process in [SECURITY.md](SECURITY.md).
 
 ```
 Toolkit/
+├── Launch-GUI.bat     # Double-click to start
 ├── Core/              # Foundation modules (always loaded first)
 ├── Modules/           # Feature modules (one per category)
-├── Gui/               # GUI-specific code
-├── Settings/          # User preferences (portable)
-└── Logs/              # Error logs (local, for testing)
+├── Gui/               # GUI host: redirects tool input and output to the window
+├── Settings/          # User preferences (created on first run)
+├── Logs/              # Action log, error log, audit trail
+└── Stand alone scripts/
 
+Tests/                 # Test-ToolRegistration.ps1
 docs/
-├── ARCHITECTURE.md    # System design
-├── GUIDE.md           # Tasks, configuration, troubleshooting
+├── ARCHITECTURE.md    # How it is built
+├── GUIDE.md           # Tasks, storage, troubleshooting
 └── CHANGELOG.md       # Release history
 ```
 
@@ -190,7 +197,7 @@ This validates all syntax and creates `Toolkit/dist/` with:
 
 - 📖 **Documentation**: Check `README.md` and `docs/`
 - 🔍 **Code Examples**: Look at existing tools in `Toolkit/Modules/`
-- 💬 **Discussions**: Open a GitHub discussion for questions
+- 💬 **Questions and ideas**: Open a GitHub issue
 
 ## License
 
