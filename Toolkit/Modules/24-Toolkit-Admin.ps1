@@ -127,7 +127,9 @@ Add-Tool -Id 'TKA-04' -Category 'Toolkit Administration' -Name 'Clear error log'
         $keep = @($errors | Where-Object { [datetime]$_.Timestamp -ge $oldDate })
 
         if ($keep.Count -gt 0) {
-            $keep | ConvertTo-Json | Set-Content -LiteralPath $Script:ErrorLogFile -Force
+            # Not `$keep | ConvertTo-Json`: piping writes a lone entry as a bare object
+            # rather than an array, and the default depth of 2 drops InvocationInfo
+            Set-JsonLogEntries -Path $Script:ErrorLogFile -Entries $keep -Depth 6
         } else {
             Remove-Item -LiteralPath $Script:ErrorLogFile -Force -ErrorAction SilentlyContinue
         }

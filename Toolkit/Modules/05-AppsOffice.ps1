@@ -10,10 +10,11 @@ Add-Tool -Id 'APP-01' -Category 'Apps & Office' -Name 'Installed software' -Desc
 }
 
 Add-Tool -Id 'APP-02' -Category 'Apps & Office' -Name 'Update all apps (winget)' -Description 'List and install app upgrades via winget' -Action {
-    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) { Write-Err 'winget is not installed (App Installer from the Microsoft Store).'; return }
-    winget upgrade --accept-source-agreements | Out-Host
+    $winget = Get-WingetPath
+    if (-not $winget) { Write-Err 'winget is not installed (App Installer from the Microsoft Store).'; return }
+    & $winget upgrade --accept-source-agreements | Out-Host
     if (Confirm-Action 'Upgrade all listed apps? (accepts package license agreements)') {
-        $null = Invoke-External 'winget' 'upgrade --all --silent --accept-source-agreements --accept-package-agreements'
+        $null = Invoke-External $winget 'upgrade --all --silent --accept-source-agreements --accept-package-agreements'
     }
 }
 
@@ -151,7 +152,8 @@ Add-Tool -Id 'APP-10' -Category 'Apps & Office' -Name 'Credential Manager cleanu
 }
 
 Add-Tool -Id 'APP-11' -Category 'Apps & Office' -Name 'Install common apps (winget)' -Description 'Browsers, 7-Zip, PDF reader, VLC, Zoom, runtimes, or search winget' -Action {
-    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) { Write-Err 'winget is not installed (App Installer from the Microsoft Store).'; return }
+    $winget = Get-WingetPath
+    if (-not $winget) { Write-Err 'winget is not installed (App Installer from the Microsoft Store).'; return }
     $apps = @(
         @{ Name = 'Google Chrome';                    Id = 'Google.Chrome' },
         @{ Name = 'Mozilla Firefox';                  Id = 'Mozilla.Firefox' },
@@ -172,12 +174,12 @@ Add-Tool -Id 'APP-11' -Category 'Apps & Office' -Name 'Install common apps (wing
     if (-not $id) {
         $q = Read-Host '  Search for'
         if (-not $q) { return }
-        winget search $q --accept-source-agreements | Out-Host
+        & $winget search $q --accept-source-agreements | Out-Host
         $id = Read-Host '  Package Id to install (from the Id column)'
         if (-not $id) { return }
     }
     if (Confirm-Action "Install $id? (accepts the package license agreement)") {
-        $code = Invoke-External 'winget' "install --id $id -e --silent --accept-source-agreements --accept-package-agreements"
+        $code = Invoke-External $winget "install --id $id -e --silent --accept-source-agreements --accept-package-agreements"
         if ($code -eq 0) { Write-Ok "$id installed." } else { Write-Warn "winget finished with exit code $code." }
     }
 }

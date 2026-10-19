@@ -504,7 +504,9 @@ $Script:SharedStyles
                 <DataTemplate>
                   <Grid>
                     <Grid.ColumnDefinitions>
-                      <ColumnDefinition Width="14"/><ColumnDefinition Width="56"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+                      <!-- ID column: the longest IDs (INTUNE-01, 9 chars) render at 59.4px in Consolas 12,
+                           so 72 leaves a ~12px gap before the name. 56 let them run into the title. -->
+                      <ColumnDefinition Width="14"/><ColumnDefinition Width="72"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock Text="{Binding StatusIcon}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="10"
                                Foreground="{DynamicResource SubText}" VerticalAlignment="Center" ToolTip="{Binding Status}"/>
