@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Removed
+- **Core modules `Cache.ps1`, `ResourceManagement.ps1` and `ErrorHandling.ps1`** (~550 lines).
+  Nothing outside those files ever called them: no tool used caching, parallel jobs,
+  the output buffer or the safe-execution wrappers. The two functions that were in use
+  (`Get-MemoryMetrics`, `Show-ResourceStats`) moved to `Common.ps1`.
+- The `Resources`, `Retry` and `Performance` settings in `Config.ps1` are now unused.
+  They are kept so older settings files still load.
+- TKA-03's "Cache Status" block, which reported on a cache nothing populated and so
+  always showed zeros. It now reports memory instead.
+
+### Added
+- Audit logging is wired into both tool runners, so TKA-05 reports real activity instead
+  of always saying "No audit events logged yet". Each run is recorded as Success, Failed,
+  Cancelled or Blocked.
+- Dependency gating: tools needing the ActiveDirectory or Microsoft.Graph module now stop
+  with one clear line and an install hint instead of failing deep inside the tool. The
+  status and installer tools (AD-01, AD-02, M365-01, M365-02) are never gated.
+- `Get-JsonLogEntries`, `Add-JsonLogEntry` and `Set-JsonLogEntries` in `Common.ps1`.
+
+### Fixed
+- **JSON logs were corrupted on every append after the first.** Windows PowerShell 5.1
+  does not enumerate a top-level JSON array out of `ConvertFrom-Json`, so the
+  `@(Get-Content ... | ConvertFrom-Json)` idiom produced a nested array that serialised
+  as `{"value": [...], "Count": n}`. This affected the error log, the audit log and the
+  usage log, in both directions: readers saw `.Count` of 1, and TKA-05 and REC-04 threw.
+  Existing corrupt files are repaired as they are read.
+- Tool usage counts were not deduplicating per day for the same reason, and the error log
+  lost `InvocationInfo` and `ExecutionContext` to the default `ConvertTo-Json` depth.
+- The `WinRM` dependency entry named the Windows feature `WinRM-IIS-Ext`, which is the
+  IIS extension and not WinRM. It has been removed rather than wired up, since gating on
+  it would have blocked all ten remote tools on machines where remoting works.
+- The AD dependency list stopped at AD-09 and omitted AD-20 through AD-33.
+- REC-04 no longer aborts on a log entry with a missing field.
+
 ## [1.5.0] - 2026-09-30
 
 ### Added

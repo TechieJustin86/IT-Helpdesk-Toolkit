@@ -18,9 +18,6 @@ Project Root/
 │   │   ├── Config.ps1          # Configuration management
 │   │   ├── Dependencies.ps1    # Prerequisite tracking
 │   │   ├── Validation.ps1      # Input validation
-│   │   ├── Cache.ps1           # Performance caching
-│   │   ├── ResourceManagement.ps1  # Memory/disk/job limiting
-│   │   ├── ErrorHandling.ps1   # Safe execution & retries
 │   │   ├── SecurityManagement.ps1  # Audit & credentials
 │   │   └── Menu.ps1            # Console menu system
 │   │
@@ -71,42 +68,27 @@ The toolkit loads modules in this specific order to ensure dependencies are met:
 2. **Config.ps1** - Settings (needed by other modules)
 3. **Dependencies.ps1** - Prerequisite tracking
 4. **Validation.ps1** - Input validation
-5. **Cache.ps1** - Caching system
-6. **ResourceManagement.ps1** - Resource monitoring
-7. **ErrorHandling.ps1** - Error handling (needs above modules)
-8. **SecurityManagement.ps1** - Security & audit (needs Config & Error)
-9. **Menu.ps1** - Console menu (needs all Core modules)
-10. **01-SystemInfo through 24-Toolkit-Admin** - Feature modules
+5. **SecurityManagement.ps1** - Security & audit (needs Config and Common)
+6. **Menu.ps1** - Console menu (needs all Core modules)
+7. **01-SystemInfo through 24-Toolkit-Admin** - Feature modules
 
 ## Core Module Functions
 
 ### Common (Common.ps1)
 **Purpose:** Foundation helpers and tool registration  
-**Key Functions:** Test-IsAdmin, Write-*, Write-Log, Write-ErrorLog, Add-Tool, Get-SystemSummary, Get-SecurityAudit
+**Key Functions:** Test-IsAdmin, Write-*, Write-Log, Write-ErrorLog, Add-Tool, Get-SystemSummary, Get-SecurityAudit, Get-JsonLogEntries, Add-JsonLogEntry, Set-JsonLogEntries, Get-MemoryMetrics, Show-ResourceStats
 
 ### Config (Config.ps1)
 **Purpose:** Centralized configuration without code changes  
 **Key Functions:** Get-ToolkitConfig, Set-ToolkitConfig, Get-ConfigValue, Test-ConfigExists
 
 ### Dependencies (Dependencies.ps1)
-**Purpose:** Track and validate prerequisites  
-**Key Functions:** Test-ModuleAvailable, Test-DependencyMet, Show-MissingDependencies
+**Purpose:** Track and validate prerequisites, and gate tools whose module is missing  
+**Key Functions:** Test-ModuleAvailable, Test-DependencyMet, Get-UnmetToolDependency, Clear-DependencyState, Show-MissingDependencies
 
 ### Validation (Validation.ps1)
 **Purpose:** Input validation for safety  
 **Key Functions:** Test-ValidIPAddress, Test-ValidComputerName, Confirm-DestructiveAction
-
-### Cache (Cache.ps1)
-**Purpose:** Performance optimization via intelligent caching  
-**Key Functions:** Set-Cache, Get-Cache, Get-CompiledRegex, Clear-ExpiredCacheItems
-
-### ResourceManagement (ResourceManagement.ps1)
-**Purpose:** Prevent resource exhaustion  
-**Key Functions:** Start-ParallelOperation, Monitor-MemoryUsage, Test-DiskSpaceAvailable
-
-### ErrorHandling (ErrorHandling.ps1)
-**Purpose:** Safe execution with retries  
-**Key Functions:** Invoke-ToolSafe, Invoke-ToolWithRetry, Rotate-OldLogs
 
 ### SecurityManagement (SecurityManagement.ps1)
 **Purpose:** Security, audit trails, credentials  
@@ -128,7 +110,10 @@ The toolkit loads modules in this specific order to ensure dependencies are met:
 **Location:** `Toolkit\Settings\gui-settings.json`
 - Theme preference (light/dark)
 - Favorite tools list
-- Window size/position
+- Recently used tools
+- Collapsed categories
+
+Window size and position are not saved; the window opens at 1340x840 each time.
 
 ### Local logs
 **Location:** `Toolkit\Logs\` (optional, for local testing)
@@ -159,15 +144,38 @@ Add-Tool -Id 'NET-01' `
 - `Admin` - Flag if tool requires administrator
 - `Action` - ScriptBlock containing tool code
 
-## Performance Characteristics
+## Logging and Diagnostics
 
-| Operation | Before v1.5 | After v1.5 | Method |
-|-----------|------------|-----------|--------|
-| SystemInfo queries | 5s | 0.5s | Caching |
-| Multi-PC operations | Slow | 5x faster | Parallel jobs |
-| Regex matching | Slow | 10x faster | Compiled cache |
-| Error detection | Silent | 100% logged | Full logging |
-| Memory usage | Unbounded | Limited | Resource monitoring |
+Every tool run goes through `Invoke-Tool` (console) or `Invoke-GuiTool` (GUI), and both
+record the same four things:
+
+| What | Where | Detail |
+|------|-------|--------|
+| The run | `toolkit.log` | One line: timestamp, user, tool ID |
+| Usage counters | `toolkit-usage.json` | Per tool, per day, deduplicated |
+| Failures | `toolkit-errors.json` | Message, type, stack trace, invocation info, admin/OS context |
+| Audit trail | `toolkit-audit.json` | Who ran what, when, and the outcome: Success, Failed, Cancelled or Blocked |
+
+Cancelling a prompt is recorded as `Cancelled`, not as a failure, so it stays out of the
+error log. A tool stopped by a missing optional module is recorded as `Blocked`.
+
+TKA-05 reports the audit trail, TKA-04 manages the error log, and REC-04 reports usage.
+
+These JSON files are arrays, and they must be read with `Get-JsonLogEntries` and written
+with `Add-JsonLogEntry` / `Set-JsonLogEntries` from `Common.ps1`. Windows PowerShell 5.1
+does not enumerate a top-level JSON array out of `ConvertFrom-Json`, so the obvious
+`@(Get-Content ... | ConvertFrom-Json)` yields a single-element array wrapping the real
+one - `.Count` reads 1 and per-entry fields come back as arrays. The helpers handle that,
+and repair log files written before they existed.
+
+### Dependency gating
+
+`Dependencies.ps1` lists the tools that need an optional module. Both runners call
+`Get-UnmetToolDependency` before running a tool, so a missing module produces one clear
+line plus an install hint instead of a "term is not recognized" error from inside the
+tool. The status and installer tools (AD-01, AD-02, M365-01, M365-02) are deliberately
+never gated, since they are how the module gets diagnosed and installed. The result is
+remembered for the session, and AD-02 and M365-02 clear it after installing.
 
 ## Configuration Examples
 
@@ -177,12 +185,17 @@ See `Toolkit\Core\Config.ps1` for all configurable options:
 # Timeouts (seconds)
 $Script:Config.Timeouts.RemoteOperation = 60  # Increase for slow systems
 
-# Parallel jobs
-$Script:Config.Performance.MaxParallelJobs = 10  # For faster bulk ops
+# Logging
+$Script:Config.Logging.MaxErrorsToKeep = 200  # Entries kept in toolkit-errors.json
 
 # Security
 $Script:Config.Security.RequireConfirmDestructive = $false  # Skip confirmation
 ```
+
+Not every section in `Config.ps1` is wired to behaviour. `Retry`, `Resources` and
+`Performance` were added for the Cache, ResourceManagement and ErrorHandling modules,
+which have since been removed; nothing reads them today. They are left in place rather
+than removed, so settings files written by older versions still load.
 
 ## Adding New Tools
 
@@ -208,4 +221,4 @@ Add-Tool -Id 'NET-30' -Category 'Network' -Name 'My Tool' -Tags @('diagnostic') 
 ---
 
 **Version:** 1.5.0  
-**Last Updated:** October 6, 2026
+**Last Updated:** October 19, 2026
