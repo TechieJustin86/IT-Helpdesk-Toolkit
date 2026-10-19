@@ -2,31 +2,75 @@
 # Category: Intune Management
 # Loaded by HelpdeskToolkit.ps1 (dot-sourced). Do not run directly.
 
+function Get-IntuneEnrollment {
+    <#
+        Intune enrollment as Windows records it, readable by a standard user.
+
+        These tools used to ask WMI's root\cimv2\mdm\dmmap namespace (the MDM Bridge
+        provider), which only answers the SYSTEM account. Anyone else - administrators
+        included - gets "Access denied", which -ErrorAction SilentlyContinue turned into
+        "not enrolled" on enrolled devices too.
+
+        Windows keeps each enrollment under HKLM\SOFTWARE\Microsoft\Enrollments\<id>.
+        Intune's has ProviderID "MS DM Server", and EnrollmentState 1 means enrolled. The
+        OMADM account named after the same <id> holds the last successful sync, in UTC.
+    #>
+    $result = [pscustomobject]@{ Enrolled = $false; UPN = $null; LastSyncUtc = $null }
+
+    $enrollment = Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Enrollments' -ErrorAction SilentlyContinue | Where-Object {
+        $props = Get-ItemProperty -LiteralPath $_.PSPath -ErrorAction SilentlyContinue
+        $props.ProviderID -eq 'MS DM Server' -and $props.EnrollmentState -eq 1
+    } | Select-Object -First 1
+    if (-not $enrollment) { return $result }
+
+    $result.Enrolled = $true
+    $result.UPN = (Get-ItemProperty -LiteralPath $enrollment.PSPath -ErrorAction SilentlyContinue).UPN
+
+    $connInfo = "HKLM:\SOFTWARE\Microsoft\Provisioning\OMADM\Accounts\$($enrollment.PSChildName)\Protected\ConnInfo"
+    $stamp = (Get-ItemProperty -LiteralPath $connInfo -ErrorAction SilentlyContinue).ServerLastSuccessTime
+    if ($stamp) {
+        # Stored as e.g. 20261019T152003Z
+        $styles = [Globalization.DateTimeStyles]::AssumeUniversal -bor [Globalization.DateTimeStyles]::AdjustToUniversal
+        try { $result.LastSyncUtc = [datetime]::ParseExact($stamp, "yyyyMMdd'T'HHmmss'Z'", [Globalization.CultureInfo]::InvariantCulture, $styles) } catch { }
+    }
+    $result
+}
+
+function Get-EntraJoinState {
+    # dsregcmd answers for any account; the dmmap check it replaces only answered SYSTEM
+    $state = @{}
+    foreach ($line in @(dsregcmd /status 2>$null)) {
+        if ($line -match '^\s*(AzureAdJoined|DomainJoined)\s*:\s*(\S+)') { $state[$matches[1]] = ($matches[2] -eq 'YES') }
+    }
+    [pscustomobject]@{ AzureAdJoined = [bool]$state['AzureAdJoined']; DomainJoined = [bool]$state['DomainJoined'] }
+}
+
 Add-Tool -Id 'INTUNE-01' -Category 'Intune Management' -Name 'Check Intune enrollment status' -Description 'Verify Intune MDM enrollment, Entra/Azure AD join status, device ID - confirms device is managed' -Action {
     Write-Section 'Intune Enrollment Status'
 
     $deviceName = $env:COMPUTERNAME
     Write-Info "Device: $deviceName"
 
-    # Check enrollment via WMI
-    $enrollmentStatus = Get-CimInstance -Namespace 'root\cimv2\mdm\dmmap' -ClassName DMClient -ErrorAction SilentlyContinue
-
-    if ($enrollmentStatus) {
+    $enrollment = Get-IntuneEnrollment
+    if ($enrollment.Enrolled) {
         Write-Ok 'Device is Intune enrolled'
-        Write-Check -Status OK -Label 'Version' -Value $enrollmentStatus.VersionNumber
+        if ($enrollment.UPN) { Write-Check -Status INFO -Label 'Enrolled by' -Value $enrollment.UPN }
+        if ($enrollment.LastSyncUtc) { Write-Check -Status INFO -Label 'Last successful sync' -Value $enrollment.LastSyncUtc.ToLocalTime().ToString('yyyy-MM-dd HH:mm') }
     } else {
         Write-Err 'Device is NOT Intune enrolled'
         Write-Info 'To enroll: Settings > Accounts > Access work or school > Connect'
         return
     }
 
-    # Check Entra/AAD join status
     Write-Section 'Azure AD / Entra ID Status'
-    $aadJoin = Get-CimInstance -Namespace 'root\cimv2\mdm\dmmap' -ClassName DMRegularObject -ErrorAction SilentlyContinue
-    if ($aadJoin) {
-        Write-Ok 'Device is Azure AD joined'
+    $join = Get-EntraJoinState
+    if ($join.AzureAdJoined) {
+        Write-Ok 'Device is Entra ID (Azure AD) joined'
+        if ($join.DomainJoined) { Write-Info 'Also joined to on-premises Active Directory (hybrid joined)' }
+    } elseif ($join.DomainJoined) {
+        Write-Info 'Device is joined to on-premises Active Directory, not Entra ID'
     } else {
-        Write-Info 'Device is NOT Azure AD joined'
+        Write-Info 'Device is NOT Entra ID joined'
     }
 
     # Check MDM policies
@@ -107,7 +151,7 @@ Add-Tool -Id 'INTUNE-04' -Category 'Intune Management' -Name 'Troubleshoot Intun
 
     # Check enrollment
     Write-Info 'Checking Intune enrollment...'
-    $enrolled = Get-CimInstance -Namespace 'root\cimv2\mdm\dmmap' -ClassName DMClient -ErrorAction SilentlyContinue
+    $enrolled = (Get-IntuneEnrollment).Enrolled
     if (-not $enrolled) {
         $issues += 'Device is not Intune enrolled'
     }
@@ -154,16 +198,38 @@ Add-Tool -Id 'INTUNE-04' -Category 'Intune Management' -Name 'Troubleshoot Intun
 Add-Tool -Id 'INTUNE-05' -Category 'Intune Management' -Name 'Export device compliance info' -Description 'Generate compliance report: enrollment status, BitLocker, firewall, Defender, last sync time - save to CSV for audits' -Action {
     Write-Section 'Device Compliance Export'
 
+    # Each column reports what it could actually determine. Previously four of them were
+    # wrong in ways that read as non-compliance: Enrolled was always "No" (see
+    # Get-IntuneEnrollment), BitLocker said "Disabled" whenever it could not read the
+    # volume (Get-BitLockerVolume needs admin), LastSync read a per-user key that was never
+    # set, and User was whoever ran the toolkit - the admin account, when elevated.
+    $enrollment = Get-IntuneEnrollment
+
+    $bitLocker = if (Test-IsAdmin) {
+        $v = Get-BitLockerVolume -MountPoint $env:SystemDrive -ErrorAction SilentlyContinue
+        if ($v) { "$($v.ProtectionStatus) ($($v.VolumeStatus))" } else { 'Not available' }
+    } else { 'Unknown - run as Administrator' }
+
+    $profiles = @(Get-NetFirewallProfile -ErrorAction SilentlyContinue)
+    $on = @($profiles | Where-Object Enabled | ForEach-Object Name)
+    $firewall = if (-not $profiles) { 'Unknown' }
+                elseif ($on.Count -eq $profiles.Count) { 'Enabled (all profiles)' }
+                elseif ($on.Count) { "Partly enabled ($($on -join ', ') only)" }
+                else { 'Disabled' }
+
+    $signedIn = (Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction SilentlyContinue).UserName
+
     $complianceInfo = [pscustomobject]@{
         ComputerName = $env:COMPUTERNAME
-        User = $env:USERNAME
-        OSVersion = (Get-CimInstance -ClassName Win32_OperatingSystem).Caption
-        Enrolled = $(if (Get-CimInstance -Namespace 'root\cimv2\mdm\dmmap' -ClassName DMClient -ErrorAction SilentlyContinue) { 'Yes' } else { 'No' })
-        BitLocker = $(if ((Get-BitLockerVolume -ErrorAction SilentlyContinue).ProtectionStatus -eq 'On') { 'Enabled' } else { 'Disabled' })
-        Firewall = $(if ((Get-NetFirewallProfile | Where-Object { $_.Enabled }).Count -gt 0) { 'Enabled' } else { 'Disabled' })
-        Defender = $(if (Get-MpPreference -ErrorAction SilentlyContinue) { 'Installed' } else { 'Not Found' })
-        LastSync = $(Get-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\MDM' -Name LastSuccessfulSync -ErrorAction SilentlyContinue).LastSuccessfulSync
-        Timestamp = Get-Date
+        SignedInUser = $(if ($signedIn) { $signedIn } else { 'None at the console' })
+        ReportedBy   = "$env:USERDOMAIN\$env:USERNAME"
+        OSVersion    = (Get-CimInstance -ClassName Win32_OperatingSystem).Caption
+        Enrolled     = $(if ($enrollment.Enrolled) { 'Yes' } else { 'No' })
+        LastSync     = $(if ($enrollment.LastSyncUtc) { $enrollment.LastSyncUtc.ToLocalTime().ToString('yyyy-MM-dd HH:mm:ss') } else { '' })
+        BitLocker    = $bitLocker
+        Firewall     = $firewall
+        Defender     = $(if (Get-MpPreference -ErrorAction SilentlyContinue) { 'Installed' } else { 'Not Found' })
+        Timestamp    = Get-Date
     }
 
     $file = Get-OutFile -Name "IntuneCompliance_$(Get-Date -Format yyyyMMdd-HHmmss).csv"
