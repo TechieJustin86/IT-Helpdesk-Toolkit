@@ -91,8 +91,12 @@ function Test-RemoteComputerWinRM {
         [Parameter(Mandatory)][string]$ComputerName,
         [int]$TimeoutSeconds = 10
     )
+    # New-PSSession has no -OperationTimeoutSec (that is New-CimSession). Passing it made
+    # this throw every time, which the catch turned into "unreachable" for every computer.
+    # The timeout belongs in a session option, in milliseconds.
     try {
-        $session = New-PSSession -ComputerName $ComputerName -ErrorAction Stop -OperationTimeoutSec $TimeoutSeconds
+        $option = New-PSSessionOption -OpenTimeout ($TimeoutSeconds * 1000)
+        $session = New-PSSession -ComputerName $ComputerName -SessionOption $option -ErrorAction Stop
         Remove-PSSession $session -ErrorAction SilentlyContinue
         return $true
     } catch {
