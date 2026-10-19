@@ -2,7 +2,7 @@
 # Category: Auto-Repair
 # Loaded by HelpdeskToolkit.ps1 (dot-sourced). Do not run directly.
 
-Add-Tool -Id 'AR-01' -Category 'Auto-Repair' -Name 'One-click PC tune-up' -Description 'Interactive system cleanup: clear temp files/browser cache, empty recycle bin, restart Windows Update/networking/audio services' -Admin -Action {
+Add-Tool -Id 'AR-01' -Category 'Auto-Repair' -Name 'One-click PC tune-up' -Description 'Interactive system cleanup: clear temp files/browser cache, optionally empty the recycle bin, restart Windows Update/networking services, rebuild icon cache' -Admin -Action {
     Write-Section 'Running Auto PC Tune-up'
 
     if (-not (Confirm-Action 'This will clear caches, temp files, and restart services. Continue?')) { return }
@@ -21,13 +21,19 @@ Add-Tool -Id 'AR-01' -Category 'Auto-Repair' -Name 'One-click PC tune-up' -Descr
         }
     }
 
-    # Empty Recycle Bin
-    Write-Info 'Emptying Recycle Bin...'
-    try {
-        $shell = New-Object -ComObject Shell.Application
-        $shell.Namespace(10).Self.InvokeVerb('Empty Recycle Bin')
-        Write-Ok 'Recycle Bin emptied'
-    } catch { }
+    # Empty Recycle Bin - opt-in. The prompt above does not mention it, and emptying the
+    # bin is permanent, so it gets the same typed confirmation as MNT-02 rather than
+    # riding along silently with a routine cache clean.
+    if (Confirm-DestructiveAction -Action 'Also permanently empty the Recycle Bin - deleted files cannot be recovered' -Target 'all drives') {
+        Write-Info 'Emptying Recycle Bin...'
+        try {
+            $shell = New-Object -ComObject Shell.Application
+            $shell.Namespace(10).Self.InvokeVerb('Empty Recycle Bin')
+            Write-Ok 'Recycle Bin emptied'
+        } catch { }
+    } else {
+        Write-Info 'Recycle Bin left alone.'
+    }
 
     # Clear browser caches
     Write-Info 'Clearing browser caches...'
