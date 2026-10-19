@@ -16,7 +16,16 @@ function Invoke-Tool {
         Write-Log "RUN $($Tool.Id) $($Tool.Name)"
         Write-ToolUsage -ToolId $Tool.Id -ToolName $Tool.Name -Category $Tool.Category
         try { & $Tool.Action | Out-Host }
-        catch { Write-Err $_.Exception.Message; Write-Log "ERROR $($Tool.Id): $($_.Exception.Message)" }
+        catch [System.OperationCanceledException] {
+            # Cancelling a prompt is not a failure: keep it out of the error log
+            Write-Warn 'Cancelled.'
+            Write-Log "CANCELLED $($Tool.Id)"
+        }
+        catch {
+            Write-Err $_.Exception.Message
+            Write-ErrorLog -ToolId $Tool.Id -ToolName $Tool.Name -ErrorRecord $_
+            Write-Log "ERROR $($Tool.Id): $($_.Exception.Message)"
+        }
     }
     Write-Host ''
     if (-not $NoPause) { Wait-Key }

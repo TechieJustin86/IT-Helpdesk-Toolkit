@@ -17,7 +17,7 @@ Add-Tool -Id 'BATCH-01' -Category 'Batch Operations' -Name 'Bulk restart PCs' -D
     $seconds = [int]$minutes * 60
     $message = $message.Replace('"', "'")
 
-    if (-not (Confirm-Action "Restart $($computerList.Count) computer(s) in $minutes minute(s)?")) { return }
+    if (-not (Confirm-DestructiveAction -Action "Restart $($computerList.Count) computer(s) in $minutes minute(s)" -Target ($computerList -join ', '))) { return }
     Write-Info "Scheduling restart on $($computerList.Count) computer(s)..."
     Write-Host ''
 

@@ -159,7 +159,7 @@ Add-Tool -Id 'RMT-05' -Category 'Remote Computers' -Name 'Remote processes' -Des
         $procs | Select-Object Name, ProcessId, @{n = 'Memory'; e = { Format-Bytes $_.WorkingSetSize } }, SessionId | Format-Table -AutoSize | Out-Host
         if (Confirm-Action 'End one of these processes?') {
             $p = Select-FromList $procs { '{0,-30} PID {1}' -f $_.Name, $_.ProcessId } 'Process to end'
-            if ($p -and (Confirm-Action "End $($p.Name) (PID $($p.ProcessId)) on $c? Unsaved work in it will be lost.")) {
+            if ($p -and (Confirm-DestructiveAction -Action "End $($p.Name) (PID $($p.ProcessId)) - unsaved work in it will be lost" -Target $c)) {
                 $r = Invoke-CimMethod -InputObject $p -MethodName Terminate
                 if ($r.ReturnValue -eq 0) { Write-Ok 'Process ended.' } else { Write-Err "Failed (code $($r.ReturnValue))." }
             }
@@ -204,7 +204,7 @@ Add-Tool -Id 'RMT-07' -Category 'Remote Computers' -Name 'Restart / shut down re
     if (-not $msg) { $msg = 'Your PC will restart for IT maintenance. Please save your work.' }
     $msg = $msg.Replace('"', "'")
     $verb = if ($a -eq '1') { 'Restart' } else { 'Shut down' }
-    if (-not (Confirm-Action "$verb $c in $min minute(s)?")) { return }
+    if (-not (Confirm-DestructiveAction -Action "$verb in $min minute(s)" -Target $c)) { return }
     $flag = if ($a -eq '1') { '/r' } else { '/s' }
     $code = Invoke-External 'shutdown.exe' "/m \\$c $flag /f /t $([int]$min * 60) /c `"$msg`""
     if ($code -eq 0) { Write-Ok "$verb scheduled on $c. Use option 3 to cancel." } else { Write-Err "shutdown.exe returned $code (access denied or PC unreachable?)." }

@@ -609,7 +609,7 @@ Add-Tool -Id 'AD-32' -Category 'Active Directory' -Name 'User profile management
         '1' {
             $username = "$(Read-Host '  Username to delete profile for')".Trim()
             if (-not $username) { return }
-            if (-not (Confirm-Action "Delete profile for $username ?")) { return }
+            if (-not (Confirm-DestructiveAction -Action 'Delete the user profile and everything in it' -Target $username)) { return }
             try {
                 # Win32_UserProfile has no Name property; match the profile folder name (strip DOMAIN\ and WQL wildcards)
                 $folder = ($username -split '\\')[-1] -replace "['%]", ''

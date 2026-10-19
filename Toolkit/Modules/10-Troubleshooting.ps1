@@ -59,13 +59,13 @@ Add-Tool -Id 'TRB-05' -Category 'Troubleshooting' -Name 'Kill a process' -Descri
     if ($hung.Count) {
         Write-Warn 'Not responding:'
         $hung | Select-Object ProcessName, Id, MainWindowTitle | Format-Table -AutoSize | Out-Host
-        if (Confirm-Action 'End all not-responding processes?') { $hung | Stop-Process -Force; Write-Ok 'Ended.'; return }
+        if (Confirm-DestructiveAction -Action "End all $($hung.Count) not-responding process(es) - unsaved work will be lost" -Target $env:COMPUTERNAME) { $hung | Stop-Process -Force; Write-Ok 'Ended.'; return }
     } else { Write-Ok 'No hung applications detected.' }
     $n = Read-Host '  Or enter a process name to end (blank to cancel)'
     if (-not $n) { return }
     $procs = @(Get-Process -Name $n -ErrorAction SilentlyContinue)
     if (-not $procs.Count) { Write-Err "No process named '$n'."; return }
-    if (Confirm-Action "End $($procs.Count) '$n' process(es)?") { $procs | Stop-Process -Force; Write-Ok 'Ended.' }
+    if (Confirm-DestructiveAction -Action "End $($procs.Count) '$n' process(es) - unsaved work will be lost" -Target $env:COMPUTERNAME) { $procs | Stop-Process -Force; Write-Ok 'Ended.' }
 }
 
 Add-Tool -Id 'TRB-06' -Category 'Troubleshooting' -Name 'Stopped automatic services' -Description 'Auto-start services not running; start them' -Action {
