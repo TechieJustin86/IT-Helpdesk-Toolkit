@@ -551,6 +551,9 @@ function Add-Tool {
         [string]$Description,
         [switch]$Admin,
         [object[]]$Tags = @(),
+        # Former IDs of tools merged into this one. -Run, Run-by-ID, saved favourites and
+        # recents, and search all accept them, so retiring a duplicate breaks nothing.
+        [string[]]$Aliases = @(),
         [Parameter(Mandatory)][scriptblock]$Action
     )
     $Script:Tools.Add([pscustomobject]@{
@@ -560,9 +563,26 @@ function Add-Tool {
         Description = $Description
         Admin = [bool]$Admin
         Tags = @($Tags)
+        Aliases = @($Aliases)
         Action = $Action
         Created = Get-Date
     })
+}
+
+function Get-ToolById {
+    # The tool registered under this ID, or under it as a former ID; $null if neither
+    param([string]$Id)
+    if (-not $Id) { return $null }
+    $exact = $Script:Tools | Where-Object { $_.Id -eq $Id } | Select-Object -First 1
+    if ($exact) { return $exact }
+    $Script:Tools | Where-Object { $_.Aliases -contains $Id } | Select-Object -First 1
+}
+
+function Resolve-ToolId {
+    # Current ID for an ID that may be a former one; unknown IDs come back unchanged
+    param([string]$Id)
+    $tool = Get-ToolById $Id
+    if ($tool) { $tool.Id } else { $Id }
 }
 
 function Get-ExecutionStats {

@@ -106,7 +106,7 @@ $loader = {
     [pscustomobject]@{
         Version = $Script:Version
         OutDir  = $Script:OutDir
-        Tools   = @($Script:Tools | Select-Object Id, Category, Name, Description, Admin)
+        Tools   = @($Script:Tools | Select-Object Id, Category, Name, Description, Admin, Aliases)
         Errors  = @($Script:ModuleErrors)
     }
 }
@@ -141,6 +141,7 @@ $Script:AllTools = @($Script:Info.Tools | ForEach-Object {
         Name        = $_.Name
         Description = $_.Description
         Admin       = [bool]$_.Admin
+        Aliases     = @($_.Aliases)
         AdminMark   = if ($_.Admin) { 'admin' } else { '' }
         Status      = 'ready'      # ready|running|completed|error
         StatusIcon  = ' '          # Status indicator symbol
@@ -176,11 +177,30 @@ $Script:Favorites = New-Object System.Collections.Generic.List[string]
 $Script:RecentTools = New-Object System.Collections.Generic.List[string]
 $Script:CollapsedCategories = New-Object System.Collections.Generic.HashSet[string]
 $Script:SavedTheme = $null
+
+# Former ID -> current ID, from tools merged into another. Saved favourites and recents are
+# rewritten through it on load, so one pointing at a retired tool follows it to its
+# replacement instead of silently disappearing; the next save stores the current ID.
+$Script:AliasMap = @{}
+foreach ($t in $Script:AllTools) { foreach ($a in @($t.Aliases)) { if ($a) { $Script:AliasMap["$a"] = $t.Id } } }
+function ConvertTo-CurrentToolId {
+    param([string]$Id)
+    if ($Script:AliasMap.ContainsKey($Id)) { $Script:AliasMap[$Id] } else { $Id }
+}
+
 try {
     $s = Get-Content -LiteralPath $Script:SettingsFile -Raw -ErrorAction Stop | ConvertFrom-Json
     if ($s.Theme -in 'Light', 'Dark') { $Script:SavedTheme = $s.Theme }
-    foreach ($id in @($s.Favorites)) { if ($id -and -not $Script:Favorites.Contains("$id")) { $Script:Favorites.Add("$id") } }
-    foreach ($id in @($s.RecentTools)) { if ($id -and -not $Script:RecentTools.Contains("$id")) { $Script:RecentTools.Add("$id") } }
+    foreach ($raw in @($s.Favorites)) {
+        if (-not $raw) { continue }
+        $id = ConvertTo-CurrentToolId "$raw"
+        if (-not $Script:Favorites.Contains($id)) { $Script:Favorites.Add($id) }
+    }
+    foreach ($raw in @($s.RecentTools)) {
+        if (-not $raw) { continue }
+        $id = ConvertTo-CurrentToolId "$raw"
+        if (-not $Script:RecentTools.Contains($id)) { $Script:RecentTools.Add($id) }
+    }
     foreach ($cat in @($s.CollapsedCategories)) { if ($cat) { [void]$Script:CollapsedCategories.Add("$cat") } }
 } catch { }
 
@@ -921,7 +941,7 @@ function Update-CategoryList {
 function Find-GuiTools {
     param([object[]]$Tools, [string]$Query)
     $pattern = "*$([WildcardPattern]::Escape($Query))*"
-    @($Tools | Where-Object { $_.Name -like $pattern -or $_.Description -like $pattern -or $_.Id -like $pattern })
+    @($Tools | Where-Object { $_.Name -like $pattern -or $_.Description -like $pattern -or $_.Id -like $pattern -or (@($_.Aliases) -like $pattern) })
 }
 
 # The search box searches all tools globally; category selection narrows results when no search active

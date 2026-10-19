@@ -82,7 +82,8 @@ if ($List) {
 }
 
 if ($Run) {
-    $tool = $Script:Tools | Where-Object { $_.Id -eq $Run -or $_.Name -eq $Run } | Select-Object -First 1
+    $tool = Get-ToolById $Run
+    if (-not $tool) { $tool = $Script:Tools | Where-Object { $_.Name -eq $Run } | Select-Object -First 1 }
     if (-not $tool) { Write-Err "No tool '$Run'. Use -List to see IDs."; exit 1 }
     Invoke-Tool $tool -NoPause
     return

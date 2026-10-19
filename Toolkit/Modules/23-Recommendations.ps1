@@ -103,43 +103,6 @@ Add-Tool -Id 'REC-03' -Category 'Recommendations' -Name 'Performance baseline' -
     Write-Info 'Run this tool again later and compare results to see changes'
 }
 
-Add-Tool -Id 'REC-04' -Category 'Recommendations' -Name 'Tool usage analytics' -Description 'Which tools you use most and their error rates' -Tags @('analytics','usage') -Action {
-    Write-Section 'Tool Usage Analytics'
-
-    $usage = Get-ToolUsage
-    if ($usage.Count -eq 0) {
-        Write-Info 'No usage data yet'
-        return
-    }
-
-    Write-Section 'Most Used Tools'
-    $usage | Select-Object -First 10 | ForEach-Object {
-        # Format operator rather than .PadRight(): a log entry with a missing field
-        # should not take the whole report down with a null method call
-        Write-Host ('  {0,-10} {1,-40} Runs: {2}' -f $_.ToolId, $_.ToolName, $_.Count) -ForegroundColor Cyan
-    }
-
-    Write-Section 'Errors by Tool'
-    $errors = $null
-    if (Test-Path $Script:ErrorLogFile) {
-        $errors = @(Get-JsonLogEntries -Path $Script:ErrorLogFile)
-    }
-
-    if ($errors) {
-        $errorsByTool = $errors | Group-Object ToolId | Sort-Object Count -Descending
-        $errorsByTool | Select-Object -First 10 | ForEach-Object {
-            Write-Warn "  $($_.Name.PadRight(10)) Errors: $($_.Count)"
-        }
-    }
-
-    Write-Section 'Quick Stats'
-    Write-Info "Total tool runs: $($usage | Measure-Object -Property Count -Sum | Select-Object -ExpandProperty Sum)"
-    if ($errors) {
-        Write-Info "Total errors: $($errors.Count)"
-        Write-Info "Error rate: $(if ($usage.Count -gt 0) { [math]::Round($errors.Count / ($usage | Measure-Object -Property Count -Sum | Select-Object -ExpandProperty Sum) * 100, 2) }else{ '0' })%"
-    }
-}
-
 Add-Tool -Id 'REC-05' -Category 'Recommendations' -Name 'Health check summary' -Description 'Complete system and toolkit health report' -Tags @('health','summary') -Action {
     Write-Section 'System Health Summary'
 

@@ -200,10 +200,31 @@ Add-Tool -Id 'MNT-21' -Category 'Maintenance & Repair' -Name 'DISM health scan (
     if ($code -eq 0) { Write-Ok 'Scan finished.' } else { Write-Warn "DISM exit code $code" }
 }
 
-Add-Tool -Id 'MNT-22' -Category 'Maintenance & Repair' -Name 'Optimize drives' -Admin -Description 'TRIM SSDs or defragment hard disks (Windows picks the right method)' -Action {
+Add-Tool -Id 'MNT-22' -Category 'Maintenance & Repair' -Name 'Optimize drives' -Admin -Description 'TRIM SSDs or defragment hard disks, one drive or all (Windows picks the right method per drive)' -Aliases @('PERF-04') -Action {
+    # Merged from PERF-04 "Disk defragmentation", whose run-on-every-drive pass is the
+    # "All fixed drives" choice. PERF-04 decided SSD vs HDD by asking whether ANY disk in
+    # the PC was an SSD, so on an SSD-boot + HDD-data machine it TRIMmed the hard disk and
+    # never defragmented it. Plain Optimize-Volume lets Windows choose per drive instead.
     $vols = @(Get-Volume -ErrorAction SilentlyContinue | Where-Object { $_.DriveLetter -and $_.DriveType -eq 'Fixed' } | Sort-Object DriveLetter)
-    $v = Select-FromList $vols { '{0}:  {1,-14} {2,10} free   {3}' -f $_.DriveLetter, $_.FileSystemLabel, (Format-Bytes $_.SizeRemaining), $_.FileSystem } 'Drive'
+    $choices = @($vols) + @([pscustomobject]@{ DriveLetter = $null; AllDrives = $true })
+    $v = Select-FromList $choices {
+        if ($_.AllDrives) { 'All fixed drives' }
+        else { '{0}:  {1,-14} {2,10} free   {3}' -f $_.DriveLetter, $_.FileSystemLabel, (Format-Bytes $_.SizeRemaining), $_.FileSystem }
+    } 'Drive'
     if (-not $v) { return }
+
+    if ($v.AllDrives) {
+        $letters = ($vols | ForEach-Object { "$($_.DriveLetter):" }) -join ' '
+        if (-not (Confirm-Action "Optimize all fixed drives ($letters)? This can take a while on hard disks.")) { return }
+        foreach ($d in $vols) {
+            Write-Info "Drive $($d.DriveLetter):"
+            try { Optimize-Volume -DriveLetter $d.DriveLetter -Verbose -ErrorAction Stop 4>&1 | ForEach-Object { Write-Host "  $_" } }
+            catch { Write-Warn "Drive $($d.DriveLetter): $($_.Exception.Message)" }
+        }
+        Write-Ok 'Optimization complete.'
+        return
+    }
+
     Write-Host '  [1] Analyze only   [2] Optimize now'
     $c = Read-Host '  Choice'
     if ($c -eq '1') {
@@ -369,28 +390,6 @@ Add-Tool -Id 'MNT-32' -Category 'Maintenance & Repair' -Name 'Unblock Windows St
     } catch { Write-Err "Configuration failed: $($_.Exception.Message)" }
 }
 
-Add-Tool -Id 'MNT-33' -Category 'Maintenance & Repair' -Name 'Remove Appx packages' -Description 'Interactively remove installed Appx packages (Windows Store apps)' -Action {
-    Write-Info 'Retrieving installed Appx packages...'
-    try {
-        $apps = @(Get-AppxPackage -ErrorAction Stop | Sort-Object Name)
-    } catch { Write-Err "Could not retrieve Appx packages: $($_.Exception.Message)"; return }
-
-    if (-not $apps.Count) { Write-Ok 'No Appx packages installed.'; return }
-
-    Write-Info "Found $($apps.Count) Appx package(s)."
-    $selection = Select-FromList $apps { '{0,-55} {1}' -f $_.Name, $_.Version } 'Appx package to remove'
-    if (-not $selection) { Write-Info 'Cancelled.'; return }
-
-    Write-Warn "Removing: $($selection.Name)"
-    if (-not (Confirm-Action "Proceed with removing '$($selection.Name)'?")) { return }
-
-    try {
-        Remove-AppxPackage -Package $selection.PackageFullName -ErrorAction Stop
-        Write-Ok "Package removed: $($selection.Name)"
-        Write-Log "Appx package removed: $($selection.Name)"
-    } catch { Write-Err "Removal failed: $($_.Exception.Message)" }
-}
-
 Add-Tool -Id 'MNT-34' -Category 'Maintenance & Repair' -Name 'Fix Outlook password prompt' -Description 'Disable credentials caching to resolve Outlook password prompt disappearing issues' -Admin -Action {
     Write-Info 'Configuring Outlook password behavior...'
 
@@ -420,9 +419,38 @@ Add-Tool -Id 'MNT-34' -Category 'Maintenance & Repair' -Name 'Fix Outlook passwo
     }
 }
 
-Add-Tool -Id 'MNT-26' -Category 'Maintenance & Repair' -Name 'Remove Bloatware' -Admin -Description 'Remove common Windows bloatware and pre-installed apps (interactively)' -Action {
-    Write-Section 'Bloatware Removal Tool'
-    Write-Host 'This tool helps remove common Windows bloatware apps.'
+Add-Tool -Id 'MNT-26' -Category 'Maintenance & Repair' -Name 'Remove bloatware and Store apps' -Admin -Description 'Remove common pre-installed bloatware (pick several) or any installed Store app (pick one)' -Aliases @('MNT-33') -Action {
+    # Merged from MNT-33 "Remove Appx packages", which is mode 2 below. The two did the same
+    # Get-AppxPackage / Remove-AppxPackage work from opposite ends: a curated list vs. all.
+    Write-Section 'Remove Bloatware and Store Apps'
+    Write-Host '  [1] Common bloatware - pick several from a known list'
+    Write-Host '  [2] Any installed Store app - pick one from everything installed'
+    $mode = Read-Host '  Choice'
+
+    if ($mode -eq '2') {
+        Write-Info 'Retrieving installed Appx packages...'
+        try {
+            $apps = @(Get-AppxPackage -ErrorAction Stop | Sort-Object Name)
+        } catch { Write-Err "Could not retrieve Appx packages: $($_.Exception.Message)"; return }
+
+        if (-not $apps.Count) { Write-Ok 'No Appx packages installed.'; return }
+
+        Write-Info "Found $($apps.Count) Appx package(s)."
+        $selection = Select-FromList $apps { '{0,-55} {1}' -f $_.Name, $_.Version } 'Appx package to remove'
+        if (-not $selection) { Write-Info 'Cancelled.'; return }
+
+        Write-Warn "Removing: $($selection.Name)"
+        if (-not (Confirm-Action "Proceed with removing '$($selection.Name)'?")) { return }
+
+        try {
+            Remove-AppxPackage -Package $selection.PackageFullName -ErrorAction Stop
+            Write-Ok "Package removed: $($selection.Name)"
+            Write-Log "Appx package removed: $($selection.Name)"
+        } catch { Write-Err "Removal failed: $($_.Exception.Message)" }
+        return
+    }
+    if ($mode -ne '1') { return }
+
     Write-Host ''
 
     # Common bloatware app packages to offer for removal

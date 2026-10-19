@@ -78,10 +78,34 @@ foreach ($tool in $tools) {
     if ($tool.Action -isnot [scriptblock])    { Add-Failure "$($tool.Id) has no runnable Action" }
 }
 
+# --- Aliases (former IDs of merged tools) ----------------------------------
+# An alias that equals a live ID would make one of the two tools unreachable by ID,
+# and one claimed by two tools would resolve unpredictably.
+
+$liveIds = @{}
+foreach ($tool in $tools) { $liveIds[$tool.Id] = $true }
+$aliasOwner = @{}
+$aliasCount = 0
+
+foreach ($tool in $tools) {
+    foreach ($alias in @($tool.Aliases)) {
+        if (-not $alias) { continue }
+        $aliasCount++
+        if ($alias -notmatch '^[A-Z0-9]+-\d+$') { Add-Failure "$($tool.Id) has a malformed alias '$alias'" }
+        if ($liveIds.ContainsKey($alias))       { Add-Failure "$($tool.Id) alias '$alias' collides with a live tool ID" }
+        if ($aliasOwner.ContainsKey($alias))    { Add-Failure "Alias '$alias' is claimed by both $($aliasOwner[$alias]) and $($tool.Id)" }
+        else                                    { $aliasOwner[$alias] = $tool.Id }
+
+        $resolved = Get-ToolById $alias
+        if (-not $resolved -or $resolved.Id -ne $tool.Id) { Add-Failure "Alias '$alias' does not resolve to $($tool.Id)" }
+    }
+}
+if ($aliasCount) { Write-Host "  aliases: $aliasCount former ID(s) declared" -ForegroundColor DarkGray }
+
 # --- Helpers the modules rely on ------------------------------------------
 
-foreach ($fn in @('Add-Tool', 'Confirm-Action', 'Confirm-DestructiveAction', 'Invoke-External',
-                  'Select-FromList', 'Write-ErrorLog', 'Write-Log', 'Test-IsAdmin')) {
+foreach ($fn in @('Add-Tool', 'Get-ToolById', 'Resolve-ToolId', 'Confirm-Action', 'Confirm-DestructiveAction',
+                  'Invoke-External', 'Select-FromList', 'Write-ErrorLog', 'Write-Log', 'Test-IsAdmin')) {
     if (-not (Get-Command $fn -CommandType Function -ErrorAction SilentlyContinue)) {
         Add-Failure "Helper function not available after load: $fn"
     }

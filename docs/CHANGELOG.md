@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Merged 9 duplicate tools into the tool they duplicated (301 -> 292 tools).** Each
+  retired ID still works as an alias, so `-Run`, Run by ID, saved favourites and recents,
+  and search all reach the replacement:
+
+  | Retired | Now | Notes |
+  |---------|-----|-------|
+  | SYS-04 BitLocker status | SEC-18 BitLocker status | Gains the manage-bde fallback and optional recovery keys |
+  | HW-13 Storage SMART health | TRB-09 Disk health (SMART) | Gains bus type and reallocated sectors; no longer admin-only |
+  | REC-04 Tool usage analytics | ANA-01 Tool usage analytics | Gains errors per tool; renamed from "heatmap" |
+  | SET-04 Verify toolkit integrity | TKA-02 Toolkit integrity check | One check: files, syntax, loading, tool counts |
+  | DEV-02 Module diagnostics | TKA-02 Toolkit integrity check | |
+  | DEV-08 Clear error log | TKA-04 Clear error log | "Clear everything" is now option 2 |
+  | PERF-04 Disk defragmentation | MNT-22 Optimize drives | "All fixed drives" is now a choice |
+  | MNT-33 Remove Appx packages | MNT-26 Remove bloatware and Store apps | "Any installed app" is now mode 2 |
+  | DAILY-07 Service quick restart | TRB-07 Restart a service | Common services list, or search |
+
+- `Add-Tool` takes `-Aliases`; `Get-ToolById` and `Resolve-ToolId` resolve former IDs.
+
+### Fixed
+- ANA-01's "Today" column was hard-coded to 1, and it listed a tool once for every day it
+  was used, because the usage log holds one row per tool per day. Usage is now rolled up
+  per tool.
+- PERF-04 chose TRIM vs defragmentation by asking whether any disk in the PC was an SSD,
+  so on an SSD-boot + HDD-data machine it TRIMmed the hard disk and never defragmented
+  it. Its replacement lets Windows choose per drive.
+- DAILY-07 compared the typed menu number as text, so "10" passed its 1-7 range check;
+  it also labelled wmiApSrv (the WMI Performance Adapter) as WMI, and reported a restart
+  as successful even when it failed.
+- The integrity checks counted tools by counting the text "Add-Tool" in each file, so
+  14-QuickLaunch showed 1 tool instead of 24. TKA-02 counts the live registry.
+- README per-category counts: Hardware & Peripherals said 11 when it had 14.
+
 ### Removed
 - **Core modules `Cache.ps1`, `ResourceManagement.ps1` and `ErrorHandling.ps1`** (~550 lines).
   Nothing outside those files ever called them: no tool used caching, parallel jobs,

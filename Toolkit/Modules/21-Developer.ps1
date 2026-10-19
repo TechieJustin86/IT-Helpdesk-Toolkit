@@ -24,39 +24,6 @@ Add-Tool -Id 'DEV-01' -Category 'Developer & Debugging' -Name 'Tool explorer' -D
     Write-Info "Total: $($Script:Tools.Count) tools in $($categories.Count) categories"
 }
 
-Add-Tool -Id 'DEV-02' -Category 'Developer & Debugging' -Name 'Module diagnostics' -Description 'Check which modules loaded successfully, show any syntax errors or loading warnings' -Action {
-    Write-Section 'Module Diagnostics'
-
-    $modulesDir = Join-Path $Script:ToolkitDir 'Modules'
-    $moduleFiles = Get-ChildItem -Path $modulesDir -Filter *.ps1 | Sort-Object Name
-
-    Write-Info "Checking all modules:"
-    $errors = @()
-
-    foreach ($file in $moduleFiles) {
-        try {
-            $content = Get-Content -Path $file.FullName -Raw
-            # Tokenize reports syntax errors through the [ref] argument; it does not throw
-            $tokenErrors = $null
-            $null = [System.Management.Automation.PSParser]::Tokenize($content, [ref]$tokenErrors)
-            if ($tokenErrors.Count) { throw "$($tokenErrors[0].Message) (line $($tokenErrors[0].Token.StartLine))" }
-            $toolCount = (($content -split 'Add-Tool' | Measure-Object).Count - 1)
-            Write-Check -Status OK -Label $file.Name -Value "$toolCount tools defined"
-        } catch {
-            Write-Check -Status FAIL -Label $file.Name -Value $_.Exception.Message
-            $errors += "$($file.Name): $($_.Exception.Message)"
-        }
-    }
-
-    Write-Host ''
-    if ($errors.Count -eq 0) {
-        Write-Ok "All modules loaded successfully!"
-    } else {
-        Write-Section 'Errors found:'
-        $errors | ForEach-Object { Write-Err "  $_" }
-    }
-}
-
 Add-Tool -Id 'DEV-03' -Category 'Developer & Debugging' -Name 'Tool statistics' -Description 'Analytics on toolkit: tools per category, admin vs user tools, module sizes - understand structure' -Action {
     Write-Section 'Toolkit Statistics'
 
@@ -235,29 +202,6 @@ Add-Tool -Id 'DEV-07' -Category 'Developer & Debugging' -Name 'Error statistics'
     }
 
     Write-Info "Run DEV-06 (Error log viewer) for detailed error information"
-}
-
-Add-Tool -Id 'DEV-08' -Category 'Developer & Debugging' -Name 'Clear error log' -Description 'Clear all logged errors - start fresh error tracking' -Admin -Action {
-    Write-Section 'Clear Error Log'
-
-    $errorLogPath = $Script:ErrorLogFile
-
-    if (-not (Test-Path $errorLogPath)) {
-        Write-Info 'No error log to clear'
-        return
-    }
-
-    if (-not (Confirm-Action 'Delete all error logs?')) {
-        Write-Info 'Cancelled'
-        return
-    }
-
-    try {
-        Remove-Item -LiteralPath $errorLogPath -Force -ErrorAction Stop
-        Write-Ok 'Error log cleared'
-    } catch {
-        Write-Err "Failed to clear error log: $_"
-    }
 }
 
 Add-Tool -Id 'DEV-09' -Category 'Developer & Debugging' -Name 'View tool source (manual)' -Description 'Instructions for viewing tool source code in module files - see exactly what a tool does' -Action {

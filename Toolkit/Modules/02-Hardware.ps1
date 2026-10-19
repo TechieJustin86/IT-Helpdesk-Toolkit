@@ -327,37 +327,6 @@ Add-Tool -Id 'HW-12' -Category 'Hardware & Peripherals' -Name 'Battery reports' 
     }
 }
 
-Add-Tool -Id 'HW-13' -Category 'Hardware & Peripherals' -Name 'Storage SMART health' -Description 'Physical disks: reallocated sectors, read errors, temperature and wear level' -Action {
-    Write-Section 'Storage Health Status'
-    $disks = @(Get-PhysicalDisk -ErrorAction SilentlyContinue)
-    if (-not $disks) { Write-Warn 'No physical disks found'; return }
-
-    $disks | ForEach-Object {
-        Write-Host "Disk: $($_.FriendlyName)" -ForegroundColor Cyan
-        Write-Check $(if ($_.HealthStatus -eq 'Healthy') { 'OK' } else { 'WARN' }) 'Health' $_.HealthStatus
-        Write-Check 'INFO' 'MediaType' $_.MediaType
-        Write-Check 'INFO' 'Size' (Format-Bytes $_.Size)
-        Write-Check 'INFO' 'Bus Type' $_.BusType
-
-        try {
-            $disk = Get-PhysicalDisk -DeviceNumber $_.DeviceId -ErrorAction SilentlyContinue
-            $reliability = Get-StorageReliabilityCounter -PhysicalDisk $disk -ErrorAction SilentlyContinue
-            if ($reliability) {
-                $reallocated = if ($reliability.ReallocateCount) { $reliability.ReallocateCount } else { 'N/A' }
-                $readErrors = if ($reliability.ReadErrorsTotal) { $reliability.ReadErrorsTotal } else { 'N/A' }
-                Write-Check 'INFO' 'Reallocated Sectors' $reallocated
-                Write-Check 'INFO' 'Read Errors' $readErrors
-                Write-Check 'INFO' 'Temperature' $(if ($reliability.Temperature) { "$($reliability.Temperature)°C" } else { 'N/A' })
-                Write-Check 'INFO' 'Wear Level' $(if ($reliability.Wear) { "$($reliability.Wear)%" } else { 'N/A' })
-            }
-        } catch { }
-        Write-Host ''
-    }
-    if (-not (Test-IsAdmin)) {
-        Write-Info 'SMART attributes: Run with administrator privileges for detailed reliability data'
-    }
-}
-
 Add-Tool -Id 'HW-14' -Category 'Hardware & Peripherals' -Name 'RAM slot utilization' -Description 'Memory modules by slot: speed, type, capacity and identification' -Action {
     Write-Section 'RAM Slot Details'
     $arrays = @(Get-CimInstance Win32_PhysicalMemoryArray -ErrorAction SilentlyContinue)

@@ -306,8 +306,16 @@ Add-Tool -Id 'SEC-17' -Category 'Security' -Name 'Startup program manager' -Desc
     Write-Log "Startup item '$($e.Name)' $(if ($enable) { 'enabled' } else { 'disabled' })"
 }
 
-Add-Tool -Id 'SEC-18' -Category 'Security' -Name 'BitLocker status' -Admin -Description 'Encryption status for all volumes and recovery key management' -Action {
+Add-Tool -Id 'SEC-18' -Category 'Security' -Name 'BitLocker status' -Admin -Description 'Encryption and protector status for all volumes, optionally the recovery keys' -Aliases @('SYS-04') -Action {
+    # Merged from SYS-04 "BitLocker status" (System Information): adds its manage-bde
+    # fallback and the optional recovery-key display to the TPM/protector detail here.
     Write-Section 'BitLocker Encryption Status'
+
+    if (-not (Get-Command Get-BitLockerVolume -ErrorAction SilentlyContinue)) {
+        Write-Warn 'BitLocker cmdlets not available on this edition. Falling back to manage-bde.'
+        manage-bde -status | Out-Host
+        return
+    }
 
     try {
         $volumes = Get-BitLockerVolume -ErrorAction SilentlyContinue
@@ -332,7 +340,15 @@ Add-Tool -Id 'SEC-18' -Category 'Security' -Name 'BitLocker status' -Admin -Desc
             Write-Host ''
         }
 
-        Write-Info 'To save recovery key: manage-bde -protectors -get'
+        # Recovery keys are shown only on request: they unlock the drive, so keep them
+        # off the screen unless the tech actually needs to read one out
+        if (Confirm-Action 'Show recovery keys?') {
+            foreach ($v in $volumes) {
+                foreach ($k in @($v.KeyProtector | Where-Object KeyProtectorType -eq 'RecoveryPassword')) {
+                    Write-Host ("  {0}  ID {1}  Key {2}" -f $v.MountPoint, $k.KeyProtectorId, $k.RecoveryPassword) -ForegroundColor Yellow
+                }
+            }
+        }
     } catch {
         Write-Err "BitLocker information unavailable: $($_.Exception.Message)"
         Write-Info 'Run as Administrator for full BitLocker details'

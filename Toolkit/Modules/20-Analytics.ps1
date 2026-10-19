@@ -2,55 +2,81 @@
 # Category: Analytics & Shortcuts
 # Loaded by HelpdeskToolkit.ps1 (dot-sourced). Do not run directly.
 
-Add-Tool -Id 'ANA-01' -Category 'Analytics' -Name 'Tool usage heatmap' -Description 'View which tools are used most frequently, last used dates, and usage trends' -Action {
+Add-Tool -Id 'ANA-01' -Category 'Analytics' -Name 'Tool usage analytics' -Description 'Most-used tools, runs today, last used, usage by category, and errors per tool' -Aliases @('REC-04') -Action {
+    # Merged from REC-04 "Tool usage analytics", which printed the same report under the
+    # same section title; its errors-per-tool and error rate are the last section here.
     Write-Section 'Tool Usage Analytics'
 
-    $usage = @(Get-ToolUsage)
-
-    if ($usage.Count -eq 0) {
+    $rows = @(Get-ToolUsage)
+    if ($rows.Count -eq 0) {
         Write-Info 'No usage data recorded yet. Tools will be tracked after they are run.'
         return
     }
 
-    $total = ($usage | Measure-Object -Property Count -Sum).Sum
+    # The usage log holds one row per tool per day, so roll it up per tool. Both former
+    # tools listed the raw rows - a tool used on three days appeared three times and
+    # "tracked tools" counted rows - and the "Today" column here was a hard-coded 1.
+    # Rows logged under a retired ID are folded into the tool that replaced it, and named
+    # after the current tool, so a merged tool's history is not split across two rows.
+    $today = (Get-Date).ToString('yyyy-MM-dd')
+    $perTool = @($rows | Where-Object { $_.ToolId } | Group-Object { Resolve-ToolId $_.ToolId } | ForEach-Object {
+        $days = @($_.Group)
+        $latest = $days | Sort-Object { "$($_.LastRun)" } -Descending | Select-Object -First 1
+        $current = Get-ToolById $_.Name
+        [pscustomobject]@{
+            ToolId   = $_.Name
+            ToolName = if ($current) { $current.Name } else { "$($latest.ToolName)" }
+            Category = if ($current) { $current.Category } else { "$($latest.Category)" }
+            Runs     = [int](($days | Measure-Object -Property Count -Sum).Sum)
+            Today    = [int](($days | Where-Object { $_.Date -eq $today } | Measure-Object -Property Count -Sum).Sum)
+            LastRun  = "$($latest.LastRun)"
+        }
+    } | Sort-Object Runs -Descending)
+    $total = [int](($perTool | Measure-Object -Property Runs -Sum).Sum)
+
     Write-Host ''
     Write-Host "  Total tool runs recorded: $total"
-    Write-Host "  Tracked tools: $($usage.Count)"
+    Write-Host "  Tools used: $($perTool.Count)"
     Write-Host ''
 
-    # Top 15 tools by usage
     Write-Host '  Top Tools by Usage:' -ForegroundColor Cyan
-    Write-Host '  ────────────────────────────────────────────────────────────'
-    Write-Host ('  {0,-6} {1,-8} {2,-25} {3}' -f 'Runs', 'Today', 'Tool Name', 'Last Used') -ForegroundColor DarkGray
-    Write-Host '  ────────────────────────────────────────────────────────────'
-
-    $usage | Select-Object -First 15 | ForEach-Object {
-        $runColor = if ($_.Count -gt 10) { 'Green' } elseif ($_.Count -gt 5) { 'Yellow' } else { 'White' }
-        $lastRun = [datetime]::ParseExact($_.LastRun, 'yyyy-MM-dd HH:mm:ss', [System.Globalization.CultureInfo]::InvariantCulture)
-        $lastRunStr = $lastRun.ToString('HH:mm')
-        Write-Host ('  {0,-6} {1,-8} {2,-25} {3}' -f $_.Count, '1', $_.ToolName.Substring(0, [Math]::Min(25, $_.ToolName.Length)), $lastRunStr) -ForegroundColor $runColor
+    Write-Host '  ──────────────────────────────────────────────────────────────────────'
+    Write-Host ('  {0,-6} {1,-6} {2,-10} {3,-32} {4}' -f 'Runs', 'Today', 'ID', 'Tool', 'Last used') -ForegroundColor DarkGray
+    Write-Host '  ──────────────────────────────────────────────────────────────────────'
+    $perTool | Select-Object -First 15 | ForEach-Object {
+        $color = if ($_.Runs -gt 10) { 'Green' } elseif ($_.Runs -gt 5) { 'Yellow' } else { 'White' }
+        $name = $_.ToolName
+        if ($name.Length -gt 32) { $name = $name.Substring(0, 29) + '...' }
+        $last = if ($_.LastRun.Length -ge 16) { $_.LastRun.Substring(0, 16) } else { $_.LastRun }
+        Write-Host ('  {0,-6} {1,-6} {2,-10} {3,-32} {4}' -f $_.Runs, $_.Today, $_.ToolId, $name, $last) -ForegroundColor $color
     }
 
     Write-Host ''
     Write-Host '  Category Breakdown:' -ForegroundColor Cyan
-    $byCategory = $usage | Group-Object Category | Sort-Object @{Expression={($_.Group | Measure-Object -Property Count -Sum).Sum}; Descending=$true}
-    $byCategory | ForEach-Object {
-        $catTotal = ($_.Group | Measure-Object -Property Count -Sum).Sum
-        $pct = [math]::Round($catTotal / $total * 100, 1)
-        Write-Host ('  {0,-25} {1,6} runs  ({2}%)' -f $_.Name, $catTotal, $pct) -ForegroundColor Gray
+    $perTool | Group-Object Category | ForEach-Object {
+        [pscustomobject]@{ Name = $_.Name; Runs = [int](($_.Group | Measure-Object -Property Runs -Sum).Sum) }
+    } | Sort-Object Runs -Descending | ForEach-Object {
+        $pct = if ($total) { [math]::Round($_.Runs / $total * 100, 1) } else { 0 }
+        Write-Host ('  {0,-26} {1,6} runs  ({2}%)' -f $_.Name, $_.Runs, $pct) -ForegroundColor Gray
     }
 
     Write-Host ''
-    Write-Host '  Usage Statistics:' -ForegroundColor Cyan
-    Write-Host ('  Most used: {0} ({1} runs)' -f $usage[0].ToolName, $usage[0].Count) -ForegroundColor Green
-    $avgRuns = [math]::Round(($usage | Measure-Object -Property Count -Average).Average, 1)
-    Write-Host ('  Average runs per tool: {0}' -f $avgRuns)
+    Write-Host '  Errors by Tool:' -ForegroundColor Cyan
+    $errors = @(Get-JsonLogEntries -Path $Script:ErrorLogFile | Where-Object { $_.ToolId })
+    if ($errors.Count) {
+        $errors | Group-Object { Resolve-ToolId $_.ToolId } | Sort-Object Count -Descending | Select-Object -First 10 | ForEach-Object {
+            Write-Host ('  {0,-10} {1} error(s)' -f $_.Name, $_.Count) -ForegroundColor Yellow
+        }
+        $rate = if ($total) { [math]::Round($errors.Count / $total * 100, 1) } else { 0 }
+        Write-Host ('  Error rate: {0}% ({1} logged errors / {2} runs)' -f $rate, $errors.Count, $total)
+    } else {
+        Write-Host '  No errors logged.' -ForegroundColor Green
+    }
     Write-Host ''
 
-    $answer = Read-Host '  Export to CSV? [y/N]'
-    if ($answer -match '^y(es)?$') {
+    if (Confirm-Action 'Export to CSV?') {
         $file = Get-OutFile 'tool-usage.csv'
-        $usage | Select-Object ToolId, ToolName, Category, Count, Date, LastRun | Export-Csv -LiteralPath $file -NoTypeInformation
+        $perTool | Select-Object ToolId, ToolName, Category, Runs, Today, LastRun | Export-Csv -LiteralPath $file -NoTypeInformation
         Write-Ok "Exported to $file"
     }
 }

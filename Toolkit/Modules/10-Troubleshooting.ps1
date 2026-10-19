@@ -79,14 +79,47 @@ Add-Tool -Id 'TRB-06' -Category 'Troubleshooting' -Name 'Stopped automatic servi
     }
 }
 
-Add-Tool -Id 'TRB-07' -Category 'Troubleshooting' -Name 'Restart a service' -Admin -Description 'Find a service by name and restart it' -Action {
-    $q = Read-Host '  Service name or part of display name'
-    if (-not $q) { return }
-    $pattern = "*$([WildcardPattern]::Escape($q))*"
-    $svc = Select-FromList @(Get-Service | Where-Object { $_.Name -like $pattern -or $_.DisplayName -like $pattern }) { '{0,-28} {1,-8} {2}' -f $_.Name, $_.Status, $_.DisplayName } 'Service'
-    if (-not $svc) { return }
-    if ($svc.Status -eq 'Running') { Restart-Service -Name $svc.Name -Force } else { Start-Service -Name $svc.Name }
-    Write-Ok "$($svc.Name) is now $((Get-Service $svc.Name).Status)."
+Add-Tool -Id 'TRB-07' -Category 'Troubleshooting' -Name 'Restart a service' -Admin -Description 'Pick a common service (spooler, Windows Update, DNS, DHCP...) or search for any service, and restart it' -Aliases @('DAILY-07') -Action {
+    # Merged from DAILY-07 "Service quick restart", whose preset list is offered first.
+    # Its picker compared the typed number as text, so "10" passed a 1-7 range check;
+    # Select-FromList avoids that. wmiApSrv is the WMI Performance Adapter, not WMI
+    # itself, and is labelled as such.
+    $presets = @(
+        @{ Name = 'Spooler';  Label = 'Print Spooler' },
+        @{ Name = 'wuauserv'; Label = 'Windows Update' },
+        @{ Name = 'CryptSvc'; Label = 'Cryptographic Services' },
+        @{ Name = 'Dnscache'; Label = 'DNS Client' },
+        @{ Name = 'DHCP';     Label = 'DHCP Client' },
+        @{ Name = 'NlaSvc';   Label = 'Network Location Awareness' },
+        @{ Name = 'wmiApSrv'; Label = 'WMI Performance Adapter' }
+    )
+    $choices = @(foreach ($p in $presets) {
+        $s = Get-Service -Name $p.Name -ErrorAction SilentlyContinue
+        if ($s) { [pscustomobject]@{ Name = $p.Name; Label = $p.Label; Status = "$($s.Status)" } }
+    })
+    $choices += [pscustomobject]@{ Name = ''; Label = 'Other service - search by name...'; Status = '' }
+
+    $pick = Select-FromList $choices { if ($_.Name) { '{0,-28} {1,-9} {2}' -f $_.Label, $_.Status, $_.Name } else { $_.Label } } 'Service'
+    if (-not $pick) { return }
+    $name = $pick.Name
+
+    if (-not $name) {
+        $q = Read-Host '  Service name or part of display name'
+        if (-not $q) { return }
+        $pattern = "*$([WildcardPattern]::Escape($q))*"
+        $svc = Select-FromList @(Get-Service | Where-Object { $_.Name -like $pattern -or $_.DisplayName -like $pattern }) { '{0,-28} {1,-8} {2}' -f $_.Name, $_.Status, $_.DisplayName } 'Service'
+        if (-not $svc) { return }
+        $name = $svc.Name
+    }
+
+    # Report the real outcome: DAILY-07 printed "restarted" even when the restart failed
+    try {
+        if ((Get-Service -Name $name).Status -eq 'Running') { Restart-Service -Name $name -Force -ErrorAction Stop }
+        else { Start-Service -Name $name -ErrorAction Stop }
+        Write-Ok "$name is now $((Get-Service $name).Status)."
+    } catch {
+        Write-Err "Could not restart $name`: $($_.Exception.Message)"
+    }
 }
 
 Add-Tool -Id 'TRB-08' -Category 'Troubleshooting' -Name 'Find large files / folders' -Description 'Biggest files or subfolders under a path' -Action {
@@ -109,23 +142,31 @@ Add-Tool -Id 'TRB-08' -Category 'Troubleshooting' -Name 'Find large files / fold
     }
 }
 
-Add-Tool -Id 'TRB-09' -Category 'Troubleshooting' -Name 'Disk health (SMART)' -Admin -Description 'Health, temperature, wear and SMART failure prediction' -Action {
+Add-Tool -Id 'TRB-09' -Category 'Troubleshooting' -Name 'Disk health (SMART)' -Description 'Health, temperature, wear, reallocated sectors and SMART failure prediction' -Aliases @('HW-13') -Action {
+    # Merged from HW-13 "Storage SMART health": adds its bus type and reallocated-sector
+    # count. This tool was kept because it also checks SMART failure prediction below.
+    # Not -Admin, like HW-13 was: health, media, bus and size need no elevation, so a
+    # standard user still gets those, and only the reliability counters go blank.
     Get-PhysicalDisk | ForEach-Object {
         $rc = $_ | Get-StorageReliabilityCounter -ErrorAction SilentlyContinue
         [pscustomobject]@{
             Disk          = $_.FriendlyName
             Media         = $_.MediaType
+            Bus           = $_.BusType
             Size          = Format-Bytes $_.Size
             Health        = $_.HealthStatus
             'Temp C'      = $rc.Temperature
             'Wear %'      = $rc.Wear
             'Power-on hrs'= $rc.PowerOnHours
+            Reallocated   = $rc.ReallocateCount
             'Read errors' = $rc.ReadErrorsUncorrected
         }
     } | Format-Table -AutoSize | Out-Host
+    if (-not (Test-IsAdmin)) { Write-Info 'Run as Administrator for the reliability counters (temperature, wear, error counts).' }
     $smart = @(Get-CimInstance -Namespace root\wmi -ClassName MSStorageDriver_FailurePredictStatus -ErrorAction SilentlyContinue)
     if ($smart | Where-Object PredictFailure) { Write-Err 'SMART predicts a disk FAILURE - back up data and replace the drive!' }
     elseif ($smart.Count) { Write-Ok 'SMART: no failure predicted.' }
+    elseif (-not (Test-IsAdmin)) { Write-Info 'SMART failure prediction also needs Administrator.' }
 }
 
 Add-Tool -Id 'TRB-10' -Category 'Troubleshooting' -Name 'Reliability history' -Description 'Stability index and reliability events (7 days)' -Action {

@@ -70,7 +70,7 @@ function Show-ToolList {
 function Find-Tools {
     param([object[]]$Tools, [string]$Query)
     $pattern = "*$([WildcardPattern]::Escape($Query))*"
-    @($Tools | Where-Object { $_.Name -like $pattern -or $_.Description -like $pattern -or $_.Id -like $pattern })
+    @($Tools | Where-Object { $_.Name -like $pattern -or $_.Description -like $pattern -or $_.Id -like $pattern -or (@($_.Aliases) -like $pattern) })
 }
 
 function Show-Tools {
@@ -129,7 +129,7 @@ function Show-MainMenu {
         }
         elseif ($c -match '^[rR]$') {
             $id = Read-Host '  Tool ID (e.g. NET-02)'
-            $t = $Script:Tools | Where-Object Id -eq $id | Select-Object -First 1
+            $t = Get-ToolById $id
             if ($t) { Invoke-Tool $t } else { Write-Warn 'Unknown ID.'; Wait-Key }
         }
         elseif ($c -match '^[oO]$') {

@@ -49,22 +49,6 @@ Add-Tool -Id 'SYS-03' -Category 'System Information' -Name 'Windows activation s
     if ($oem) { Write-Info "OEM key embedded in firmware: $oem" } else { Write-Info 'No OEM key embedded in firmware.' }
 }
 
-Add-Tool -Id 'SYS-04' -Category 'System Information' -Name 'BitLocker status' -Admin -Description 'Encryption status of all volumes, optional recovery key' -Action {
-    if (-not (Get-Command Get-BitLockerVolume -ErrorAction SilentlyContinue)) {
-        Write-Warn 'BitLocker cmdlets not available on this edition. Falling back to manage-bde.'
-        manage-bde -status | Out-Host
-        return
-    }
-    $vols = Get-BitLockerVolume
-    $vols | Select-Object MountPoint, VolumeType, VolumeStatus, ProtectionStatus, EncryptionPercentage, EncryptionMethod | Format-Table -AutoSize | Out-Host
-    if (Confirm-Action 'Show recovery keys?') {
-        foreach ($v in $vols) {
-            $keys = $v.KeyProtector | Where-Object KeyProtectorType -eq 'RecoveryPassword'
-            foreach ($k in $keys) { Write-Host ("  {0}  ID {1}  Key {2}" -f $v.MountPoint, $k.KeyProtectorId, $k.RecoveryPassword) -ForegroundColor Yellow }
-        }
-    }
-}
-
 Add-Tool -Id 'SYS-05' -Category 'System Information' -Name 'Battery health report' -Description 'Generate the powercfg battery report (laptops)' -Action {
     if (-not (Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue)) { Write-Warn 'No battery detected on this device.'; return }
     $file = Get-OutFile 'battery-report.html'

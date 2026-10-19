@@ -205,33 +205,3 @@ Add-Tool -Id 'DAILY-06' -Category 'Daily Utilities' -Name 'Send test email' -Des
     }
 }
 
-Add-Tool -Id 'DAILY-07' -Category 'Daily Utilities' -Name 'Service quick restart' -Description 'One-click service restart menu: Print Spooler, Windows Update, WMI, DHCP, DNS, CryptSvc - fixes service-related issues' -Admin -Action {
-    Write-Section 'Service Manager'
-
-    $commonServices = @(
-        'Spooler',      # Print Spooler
-        'wuauserv',     # Windows Update
-        'wmiApSrv',     # WMI Performance Adapter
-        'DHCP',         # DHCP Client
-        'Dnscache',     # DNS Client
-        'NlaSvc',       # Network Location Awareness
-        'CryptSvc'      # Cryptographic Services
-    )
-
-    Write-Info 'Common services:'
-    for ($i = 0; $i -lt $commonServices.Count; $i++) {
-        $service = Get-Service -Name $commonServices[$i] -ErrorAction SilentlyContinue
-        $status = if ($service) { $service.Status } else { 'Not Found' }
-        Write-Host "  [$($i+1)] $($commonServices[$i]) - $status" -ForegroundColor $(if ($service.Status -eq 'Running') { 'Green' } else { 'Yellow' })
-    }
-
-    $choice = Read-Host '  Pick service to restart (or leave blank)'
-    if ($choice -and $choice -ge 1 -and $choice -le $commonServices.Count) {
-        $svc = $commonServices[$choice - 1]
-        Write-Info "Restarting $svc..."
-        Restart-Service -Name $svc -Force -ErrorAction SilentlyContinue
-        Start-Sleep -Seconds 2
-        $status = (Get-Service -Name $svc).Status
-        Write-Ok "Service restarted - Current status: $status"
-    }
-}
