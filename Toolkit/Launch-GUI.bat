@@ -2,6 +2,8 @@
 REM Double-click to start the IT Helpdesk Toolkit as Administrator.
 REM If this window isn't elevated, it relaunches itself through the UAC prompt.
 REM Choosing "No" at the prompt opens the toolkit as a standard user instead.
+REM Lives inside the Toolkit folder so that folder is all you need: copy it to a
+REM flash drive and double-click this file on any PC. %~dp0 is this folder.
 
 REM fltmc only succeeds when elevated (more reliable than "net session")
 fltmc >nul 2>&1
@@ -13,4 +15,4 @@ if %errorlevel% equ 0 exit /b
 
 REM UAC was cancelled - open without admin rights
 :launch
-start "" powershell.exe -NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File "%~dp0Toolkit\HelpdeskToolkit-GUI.ps1" -NoElevate
+start "" powershell.exe -NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File "%~dp0HelpdeskToolkit-GUI.ps1" -NoElevate

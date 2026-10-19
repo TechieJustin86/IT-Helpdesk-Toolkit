@@ -10,7 +10,7 @@ git checkout -b feature/your-name
 
 # 2. Make changes & test locally
 # Edit files, then test:
-.\Launch-GUI.bat
+.\Toolkit\Launch-GUI.bat
 # or
 .\Toolkit\HelpdeskToolkit.ps1 -Run TOOL-ID
 
@@ -73,7 +73,7 @@ git checkout -b feature/brief-description
 
 **Test the GUI:**
 ```powershell
-.\Launch-GUI.bat
+.\Toolkit\Launch-GUI.bat
 # Find your tool and test it
 ```
 
@@ -161,7 +161,7 @@ git checkout -b fix/set-01-settings-error
 # 4. Fix the issue
 
 # 5. Test it
-.\Launch-GUI.bat
+.\Toolkit\Launch-GUI.bat
 # Navigate to SET-01, test the fix
 
 # 6. Commit
@@ -190,7 +190,7 @@ git checkout -b feature/add-network-scanner
 Add-Tool -Id 'NET-30' -Category 'Network' -Name 'Network Scanner' ...
 
 # 4. Test it
-.\Launch-GUI.bat
+.\Toolkit\Launch-GUI.bat
 # Find the new tool in Network category, test it
 
 # 5. Commit
@@ -209,11 +209,11 @@ Includes configurable timeout and CIDR range support."
 
 ```
 D:\Projects\Git_PS_IT_Helpdesk_Toolkit\
-├── Launch-GUI.bat                   # Double-click to start
-├── Toolkit\
+├── Toolkit\                         # Self-contained: copy to a flash drive to run anywhere
+│   ├── Launch-GUI.bat               # Double-click to start
 │   ├── HelpdeskToolkit.ps1          # Console entry point
 │   ├── HelpdeskToolkit-GUI.ps1      # GUI entry point
-│   ├── Core\                        # Shared helpers, config, error handling
+│   ├── Core\                        # Shared helpers, config, dependencies, audit log
 │   ├── Modules\                     # Feature modules (one per category)
 │   └── Stand alone scripts\         # Independent tools
 ├── docs\                            # ARCHITECTURE, GUIDE, CHANGELOG
