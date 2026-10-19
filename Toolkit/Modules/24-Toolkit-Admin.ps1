@@ -1,4 +1,4 @@
-# Modules\24-Toolkit-Admin.ps1
+﻿# Modules\24-Toolkit-Admin.ps1
 # Category: Toolkit Administration
 # Configuration, maintenance, and troubleshooting for the toolkit itself.
 
@@ -26,7 +26,7 @@ Add-Tool -Id 'TKA-01' -Category 'Toolkit Administration' -Name 'Toolkit configur
 Add-Tool -Id 'TKA-02' -Category 'Toolkit Administration' -Name 'Toolkit integrity check' -Description 'Verify toolkit files are present and not corrupted' -Tags @('maintenance','integrity') -Action {
     Write-Section 'Verifying Toolkit Integrity'
 
-    $coreFiles = @('Common.ps1', 'Config.ps1', 'Dependencies.ps1', 'Validation.ps1', 'Cache.ps1', 'ResourceManagement.ps1', 'ErrorHandling.ps1', 'SecurityManagement.ps1')
+    $coreFiles = @('Common.ps1', 'Config.ps1', 'Dependencies.ps1', 'Validation.ps1', 'SecurityManagement.ps1', 'Menu.ps1')
     $coreDir = Join-Path $Script:ToolkitDir 'Core'
     $modulesDir = Join-Path $Script:ToolkitDir 'Modules'
 
@@ -93,16 +93,14 @@ Add-Tool -Id 'TKA-03' -Category 'Toolkit Administration' -Name 'Toolkit diagnost
     Write-Check 'INFO' 'Size' $(Format-Bytes $outDirSize)
 
     if (Test-Path $Script:ErrorLogFile) {
-        $errorCount = @(Get-Content -LiteralPath $Script:ErrorLogFile -Raw | ConvertFrom-Json).Count
+        $errorCount = @(Get-JsonLogEntries -Path $Script:ErrorLogFile).Count
         Write-Check 'WARN' 'Errors Logged' $errorCount
     }
 
-    Write-Section 'Cache Status'
-    $cacheStats = Get-CacheStats
-    Write-Check 'INFO' 'Cache Items' $cacheStats.CacheSize
-    Write-Check 'INFO' 'Valid Items' $cacheStats.ValidItems
-    Write-Check 'INFO' 'Expired Items' $cacheStats.ExpiredItems
-    Write-Check 'INFO' 'Compiled Regexes' $cacheStats.CompiledRegexes
+    Write-Section 'Memory'
+    $mem = Get-MemoryMetrics
+    Write-Check 'INFO' 'Toolkit Process' "$($mem.ProcessMemoryMB)MB"
+    Write-Check 'INFO' 'System Memory Used' "$($mem.MemoryUtilizationPercent)%"
 }
 
 Add-Tool -Id 'TKA-04' -Category 'Toolkit Administration' -Name 'Clear error log' -Description 'Remove old error logs to free space' -Tags @('maintenance','cleanup') -Action {
@@ -113,7 +111,7 @@ Add-Tool -Id 'TKA-04' -Category 'Toolkit Administration' -Name 'Clear error log'
         return
     }
 
-    $errors = @(Get-Content -LiteralPath $Script:ErrorLogFile -Raw | ConvertFrom-Json)
+    $errors = @(Get-JsonLogEntries -Path $Script:ErrorLogFile)
     Write-Info "Current error log size: $($errors.Count) entries"
 
     $oldDate = (Get-Date).AddDays(-30)
@@ -146,7 +144,7 @@ Add-Tool -Id 'TKA-05' -Category 'Toolkit Administration' -Name 'Security audit r
         return
     }
 
-    $audit = @(Get-Content -LiteralPath $Script:AuditLog -Raw | ConvertFrom-Json)
+    $audit = @(Get-JsonLogEntries -Path $Script:AuditLog)
     Write-Info "Total audit events: $($audit.Count)"
 
     Write-Section 'Recent Actions (Last 24 Hours)'

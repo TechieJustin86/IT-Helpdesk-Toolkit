@@ -134,20 +134,11 @@ function Write-ErrorLog {
             }
         }
 
-        # Append to JSON error log
-        $errors = @()
-        if (Test-Path $Script:ErrorLogFile) {
-            $errors = @(Get-Content -LiteralPath $Script:ErrorLogFile -Raw | ConvertFrom-Json)
-        }
-        $errors += $errorEntry
-
-        # Keep only last 200 errors (configurable)
+        # Append to JSON error log. Depth 6 keeps InvocationInfo and ExecutionContext
+        # intact; the ConvertTo-Json default of 2 flattened them to type names.
         $maxErrors = Get-ConfigValue -Category 'Logging' -Setting 'MaxErrorsToKeep'
-        if ($errors.Count -gt $maxErrors) {
-            $errors = $errors | Select-Object -Last $maxErrors
-        }
-
-        $errors | ConvertTo-Json | Set-Content -LiteralPath $Script:ErrorLogFile -Force
+        if (-not $maxErrors) { $maxErrors = 200 }
+        Add-JsonLogEntry -Path $Script:ErrorLogFile -Entry $errorEntry -MaxEntries $maxErrors -Depth 6
 
         # Update stats
         $Script:ExecutionStats.ToolsFailed++
@@ -161,17 +152,14 @@ function Write-ToolUsage {
         $usageFile = Join-Path $Script:OutDir 'toolkit-usage.json'
         $now = Get-Date
 
-        $usage = @()
-        if (Test-Path $usageFile) {
-            $usage = @(Get-Content -LiteralPath $usageFile -Raw | ConvertFrom-Json)
-        }
+        $usage = @(Get-JsonLogEntries -Path $usageFile)
 
         # Check if tool run already exists today
         $today = $now.ToString('yyyy-MM-dd')
-        $existing = $usage | Where-Object { $_.ToolId -eq $ToolId -and $_.Date -eq $today }
+        $existing = $usage | Where-Object { $_.ToolId -eq $ToolId -and $_.Date -eq $today } | Select-Object -First 1
 
         if ($existing) {
-            $existing.Count += 1
+            $existing.Count = [int]$existing.Count + 1
             $existing.LastRun = $now.ToString('yyyy-MM-dd HH:mm:ss')
         } else {
             $usage += @{
@@ -185,19 +173,14 @@ function Write-ToolUsage {
             }
         }
 
-        $usage | ConvertTo-Json | Set-Content -LiteralPath $usageFile -Force
+        Set-JsonLogEntries -Path $usageFile -Entries $usage -Depth 4
     } catch { }
 }
 
 function Get-ToolUsage {
     $usageFile = Join-Path $Script:OutDir 'toolkit-usage.json'
-    $usage = @()
-    if (Test-Path $usageFile) {
-        try {
-            $usage = @(Get-Content -LiteralPath $usageFile -Raw | ConvertFrom-Json -ErrorAction Stop)
-        } catch { }
-    }
-    $usage | Sort-Object -Property @{Expression={$_.Count}; Descending=$true}
+    $usage = @(Get-JsonLogEntries -Path $usageFile)
+    $usage | Sort-Object -Property @{Expression={[int]$_.Count}; Descending=$true}
 }
 
 function Confirm-Action {
@@ -522,14 +505,9 @@ function Show-Audit {
 
 function Get-ErrorLog {
     param([int]$LastHours = 24)
-    $errors = @()
-    if (Test-Path $Script:ErrorLogFile) {
-        try {
-            $errors = @(Get-Content -LiteralPath $Script:ErrorLogFile -Raw | ConvertFrom-Json)
-            $cutoff = (Get-Date).AddHours(-$LastHours)
-            $errors = @($errors | Where-Object { [datetime]$_.Timestamp -gt $cutoff })
-        } catch { }
-    }
+    $errors = @(Get-JsonLogEntries -Path $Script:ErrorLogFile)
+    $cutoff = (Get-Date).AddHours(-$LastHours)
+    $errors = @($errors | Where-Object { $_.Timestamp -and [datetime]$_.Timestamp -gt $cutoff })
     return $errors | Sort-Object Timestamp -Descending
 }
 
@@ -587,6 +565,121 @@ function Find-Tools {
         $_.Description.ToLower().Contains($q) -or
         $_.Id.ToLower().Contains($q)
     }
+}
+
+#endregion
+
+#region ---------------------------------------------------------------- JSON log files
+
+function Add-JsonLogEntry {
+    <#
+        Appends one entry to a JSON array file, keeping at most MaxEntries.
+
+        Windows PowerShell 5.1 does not enumerate a top-level JSON array out of
+        ConvertFrom-Json - it hands back the whole array as one object. Wrapping that in
+        @() therefore produces a nested array, and the next append serialises it as
+        {"value": [...], "Count": n}, which corrupts the file and breaks every reader.
+        Using += against an empty array flattens it correctly, and -InputObject keeps
+        the array shape when there is only one entry.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)][hashtable]$Entry,
+        [int]$MaxEntries = 500,
+        [int]$Depth = 6
+    )
+
+    # An unreadable or already-corrupt file comes back empty, so the new entry is still
+    # recorded rather than lost to a parse error.
+    $entries = @(Get-JsonLogEntries -Path $Path)
+    $entries += $Entry
+    if ($entries.Count -gt $MaxEntries) { $entries = @($entries | Select-Object -Last $MaxEntries) }
+
+    Set-JsonLogEntries -Path $Path -Entries $entries -Depth $Depth
+}
+
+function Get-JsonLogEntries {
+    <#
+        Reads a JSON array log file as a flat array. Always use this instead of
+        @(Get-Content ... | ConvertFrom-Json): in Windows PowerShell 5.1 that idiom
+        returns a single-element array wrapping the real one, so .Count reads 1 and
+        per-entry property access returns arrays instead of values.
+    #>
+    param([Parameter(Mandatory)][string]$Path)
+
+    if (-not (Test-Path -LiteralPath $Path)) { return @() }
+    try {
+        $parsed = Get-Content -LiteralPath $Path -Raw -ErrorAction Stop | ConvertFrom-Json
+        if ($null -eq $parsed) { return @() }
+
+        $entries = @()
+        $entries += $parsed
+
+        # Repair logs written by the older append logic. Those files contain
+        # {"value": [ ...real entries... ], "Count": n} wrappers, which is how
+        # ConvertTo-Json serialised the accidentally nested array, sometimes with
+        # non-record junk such as {"value": " ", "Count": 2} mixed in. No log record in
+        # this toolkit has a "value" field, so that shape is always the artefact: unwrap
+        # it when it holds entries, discard it otherwise. An upgraded toolkit then reads
+        # its existing history instead of choking on it.
+        $flat = @()
+        foreach ($entry in $entries) {
+            if ($null -eq $entry) { continue }
+            $names = @($entry.PSObject.Properties.Name)
+            if (($names -contains 'value') -and ($names -contains 'Count')) {
+                if (($entry.value -is [System.Collections.IEnumerable]) -and ($entry.value -isnot [string])) {
+                    $flat += @($entry.value | Where-Object { $_ -is [psobject] })
+                }
+                continue
+            }
+            $flat += $entry
+        }
+        return $flat
+    } catch {
+        return @()
+    }
+}
+
+function Set-JsonLogEntries {
+    # -InputObject keeps the array shape when there is only one entry; piping would
+    # serialise a lone entry as a bare object and break the next read.
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [object[]]$Entries = @(),
+        [int]$Depth = 6
+    )
+    $json = ConvertTo-Json -InputObject @($Entries) -Depth $Depth
+    Set-Content -LiteralPath $Path -Value $json -Force
+}
+
+#endregion
+
+#region ---------------------------------------------------------------- Resource metrics
+
+# Kept from the former ResourceManagement.ps1, which was removed: these two were the only
+# functions in it that anything called (REC-01, REC-03 and now TKA-03). The rest reported
+# on parallel jobs and an output buffer no tool ever used, so they always read zero.
+# Show-ResourceStats no longer prints those always-zero lines.
+
+function Get-MemoryMetrics {
+    $os = Get-CimInstance Win32_OperatingSystem
+    $process = Get-Process -Id $PID
+
+    return @{
+        ProcessMemoryMB          = [math]::Round($process.WorkingSet / 1MB, 2)
+        SystemFreeMemoryMB       = [math]::Round($os.FreePhysicalMemory / 1024, 2)
+        SystemTotalMemoryMB      = [math]::Round($os.TotalVisibleMemorySize / 1024, 2)
+        MemoryUtilizationPercent = [math]::Round((($os.TotalVisibleMemorySize - $os.FreePhysicalMemory) / $os.TotalVisibleMemorySize) * 100, 2)
+    }
+}
+
+function Show-ResourceStats {
+    $memory = Get-MemoryMetrics
+
+    Write-Section 'Resource Statistics'
+    Write-Info "Process Memory: $($memory.ProcessMemoryMB)MB"
+    Write-Info "System Free: $($memory.SystemFreeMemoryMB)MB / $($memory.SystemTotalMemoryMB)MB"
+    Write-Info "Memory Utilization: $($memory.MemoryUtilizationPercent)%"
 }
 
 #endregion

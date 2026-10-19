@@ -116,18 +116,7 @@ function Log-AuditEvent {
             IsAdmin = (Test-IsAdmin)
         }
 
-        $audit = @()
-        if (Test-Path $Script:AuditLog) {
-            $audit = @(Get-Content -LiteralPath $Script:AuditLog -Raw | ConvertFrom-Json)
-        }
-        $audit += $entry
-
-        # Keep last 500 audit entries
-        if ($audit.Count -gt 500) {
-            $audit = $audit | Select-Object -Last 500
-        }
-
-        $audit | ConvertTo-Json | Set-Content -LiteralPath $Script:AuditLog -Force
+        Add-JsonLogEntry -Path $Script:AuditLog -Entry $entry -MaxEntries 500 -Depth 4
     } catch {
         Write-Log "Audit logging failed: $_"
     }
@@ -144,7 +133,7 @@ function Get-AuditLog {
     if (-not (Test-Path $Script:AuditLog)) { return @() }
 
     try {
-        $audit = @(Get-Content -LiteralPath $Script:AuditLog -Raw | ConvertFrom-Json)
+        $audit = @(Get-JsonLogEntries -Path $Script:AuditLog)
         $cutoff = (Get-Date).AddDays(-$LastDays)
 
         $audit = @($audit | Where-Object {

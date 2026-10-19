@@ -1,4 +1,4 @@
-# Modules\23-Recommendations.ps1
+﻿# Modules\23-Recommendations.ps1
 # Category: Recommendations
 # Performance diagnostics and improvement recommendations.
 
@@ -114,14 +114,15 @@ Add-Tool -Id 'REC-04' -Category 'Recommendations' -Name 'Tool usage analytics' -
 
     Write-Section 'Most Used Tools'
     $usage | Select-Object -First 10 | ForEach-Object {
-        $runs = $_.Count
-        Write-Host "  $($_.ToolId.PadRight(10)) $($_.ToolName.PadRight(40)) Runs: $runs" -ForegroundColor Cyan
+        # Format operator rather than .PadRight(): a log entry with a missing field
+        # should not take the whole report down with a null method call
+        Write-Host ('  {0,-10} {1,-40} Runs: {2}' -f $_.ToolId, $_.ToolName, $_.Count) -ForegroundColor Cyan
     }
 
     Write-Section 'Errors by Tool'
     $errors = $null
     if (Test-Path $Script:ErrorLogFile) {
-        $errors = @(Get-Content -LiteralPath $Script:ErrorLogFile -Raw | ConvertFrom-Json)
+        $errors = @(Get-JsonLogEntries -Path $Script:ErrorLogFile)
     }
 
     if ($errors) {
@@ -149,7 +150,7 @@ Add-Tool -Id 'REC-05' -Category 'Recommendations' -Name 'Health check summary' -
     $stats = Get-ExecutionStats
     $errors = $null
     if (Test-Path $Script:ErrorLogFile) {
-        $errors = @(Get-Content -LiteralPath $Script:ErrorLogFile -Raw | ConvertFrom-Json)
+        $errors = @(Get-JsonLogEntries -Path $Script:ErrorLogFile)
     }
 
     Write-Check 'INFO' 'Tools Available' $Script:Tools.Count
