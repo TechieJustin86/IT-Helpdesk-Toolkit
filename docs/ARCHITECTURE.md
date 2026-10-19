@@ -26,7 +26,7 @@ Project Root/
 │   │
 │   ├── Modules/                # Feature modules (loaded after Core)
 │   │   ├── 01-SystemInfo.ps1       # 14 system diagnostic tools
-│   │   ├── 02-Hardware.ps1         # 11 hardware tools
+│   │   ├── 02-Hardware.ps1         # 14 hardware tools
 │   │   ├── 03-Network.ps1          # 31 network tools
 │   │   ├── 04-Maintenance.ps1      # 34 maintenance tools
 │   │   ├── 05-AppsOffice.ps1       # 13 apps/Office tools
