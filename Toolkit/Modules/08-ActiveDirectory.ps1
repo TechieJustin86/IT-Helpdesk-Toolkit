@@ -58,6 +58,8 @@ Add-Tool -Id 'AD-02' -Category 'Active Directory' -Name 'Install RSAT AD tools' 
         $r = Add-WindowsCapability -Online -Name $cap.Name -ErrorAction Stop
         Write-Ok "Installed. Restart needed: $(if ($r.RestartNeeded) { 'Yes' } else { 'No' })"
         Write-Log "RSAT AD tools installed ($($cap.Name))"
+        # Let the dependency gate re-check, so the AD tools unlock without a restart
+        Clear-DependencyState -DependencyKey 'ActiveDirectory'
         try { Import-Module ActiveDirectory -Force -ErrorAction Stop -WarningAction SilentlyContinue; Write-Ok 'ActiveDirectory module loaded.' }
         catch { Write-Info 'Restart the toolkit to load the new module.' }
     } catch {

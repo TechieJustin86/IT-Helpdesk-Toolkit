@@ -10,21 +10,32 @@ function Invoke-Tool {
     Write-Host ("  === {0}  {1} ===" -f $Tool.Id, $Tool.Name) -ForegroundColor Cyan
     if ($Tool.Description) { Write-Host "  $($Tool.Description)" -ForegroundColor DarkGray }
     Write-Host ''
+    $blocked = Get-UnmetToolDependency -ToolId $Tool.Id
+
     if ($Tool.Admin -and -not (Test-IsAdmin)) {
         Write-Warn 'This tool requires Administrator rights. Restart the toolkit as Administrator.'
+    } elseif ($blocked) {
+        Write-Warn "This tool needs the $($blocked.Module) module, which is not available."
+        Write-Info $blocked.InstallNote
+        Log-AuditEvent -Action $Tool.Name -ToolId $Tool.Id -Target $env:COMPUTERNAME -Status 'Blocked' -Details "Missing dependency: $($blocked.Module)"
     } else {
         Write-Log "RUN $($Tool.Id) $($Tool.Name)"
         Write-ToolUsage -ToolId $Tool.Id -ToolName $Tool.Name -Category $Tool.Category
-        try { & $Tool.Action | Out-Host }
+        try {
+            & $Tool.Action | Out-Host
+            Log-AuditEvent -Action $Tool.Name -ToolId $Tool.Id -Target $env:COMPUTERNAME -Status 'Success'
+        }
         catch [System.OperationCanceledException] {
             # Cancelling a prompt is not a failure: keep it out of the error log
             Write-Warn 'Cancelled.'
             Write-Log "CANCELLED $($Tool.Id)"
+            Log-AuditEvent -Action $Tool.Name -ToolId $Tool.Id -Target $env:COMPUTERNAME -Status 'Cancelled'
         }
         catch {
             Write-Err $_.Exception.Message
             Write-ErrorLog -ToolId $Tool.Id -ToolName $Tool.Name -ErrorRecord $_
             Write-Log "ERROR $($Tool.Id): $($_.Exception.Message)"
+            Log-AuditEvent -Action $Tool.Name -ToolId $Tool.Id -Target $env:COMPUTERNAME -Status 'Failed' -Details $_.Exception.Message
         }
     }
     Write-Host ''
