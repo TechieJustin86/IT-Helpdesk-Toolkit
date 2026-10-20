@@ -20,7 +20,9 @@ Add-Tool -Id 'TKA-01' -Category 'Toolkit Administration' -Name 'Toolkit configur
     Write-Section 'Security Settings'
     $config.Security | Format-Table -AutoSize | Out-Host
 
-    Write-Info 'To modify settings, contact your administrator or edit Core\Config.ps1'
+    # Saying "edit Config.ps1" alone implied every value above takes effect; only one does
+    Write-Info 'Only Logging.MaxErrorsToKeep changes the toolkit''s behaviour today. The other values are not read.'
+    Write-Info 'To change it, edit Core\Config.ps1'
 }
 
 Add-Tool -Id 'TKA-02' -Category 'Toolkit Administration' -Name 'Toolkit integrity check' -Description 'Required files present, every script parses, modules loaded, and tools registered per category' -Tags @('maintenance','integrity') -Aliases @('SET-04', 'DEV-02') -Action {
@@ -214,23 +216,23 @@ Add-Tool -Id 'TKA-05' -Category 'Toolkit Administration' -Name 'Security audit r
     }
 }
 
-Add-Tool -Id 'TKA-06' -Category 'Toolkit Administration' -Name 'About this toolkit' -Description 'Version, features, and system requirements' -Tags @('about','information') -Action {
+Add-Tool -Id 'TKA-06' -Category 'Toolkit Administration' -Name 'About this toolkit' -Description 'Version, built-in safeguards, and system information' -Tags @('about','information') -Action {
     Write-Section 'IT Helpdesk Toolkit'
     Write-Host ''
     Write-Host '  Version: ' -ForegroundColor Cyan -NoNewline; Write-Host $Script:Version
     Write-Host '  Built for: Windows PowerShell 5.1 & PowerShell 7+'
-    Write-Host '  Features: 250+ diagnostic and repair tools in 24 categories'
+    Write-Host "  Tools: $($Script:Tools.Count) in $(@($Script:Tools | ForEach-Object Category | Select-Object -Unique).Count) categories"
     Write-Host ''
 
-    Write-Section 'Enhancement Features (v1.5+)'
-    Write-Host '  ✓ Advanced error handling and logging'
-    Write-Host '  ✓ Dependency tracking and validation'
-    Write-Host '  ✓ Performance caching and optimization'
-    Write-Host '  ✓ Resource monitoring and management'
-    Write-Host '  ✓ Security audit trails'
-    Write-Host '  ✓ Configuration management'
-    Write-Host '  ✓ Input validation helpers'
-    Write-Host '  ✓ Execution statistics tracking'
+    # Only what the code does today. This list used to claim caching, resource management
+    # and execution statistics, none of which ran.
+    Write-Section 'Built-in Safeguards'
+    Write-Host '  ✓ Admin-only tools are refused until the toolkit runs elevated'
+    Write-Host '  ✓ Irreversible actions need "yes" typed to confirm'
+    Write-Host '  ✓ Tools that need the AD or Graph modules stop with an install hint if they are missing'
+    Write-Host '  ✓ Every tool run is recorded in the audit trail (TKA-05)'
+    Write-Host '  ✓ Failures are logged with full context (DEV-06 shows them)'
+    Write-Host '  ✓ Usage analytics (ANA-01) and an integrity check (TKA-02)'
     Write-Host ''
 
     Write-Section 'System Info'
@@ -241,7 +243,8 @@ Add-Tool -Id 'TKA-06' -Category 'Toolkit Administration' -Name 'About this toolk
     Write-Check 'INFO' 'RAM' $info.'RAM total'
 
     Write-Section 'Troubleshooting'
-    Write-Host '  • Run TKA-03 (Toolkit Diagnostics) to check health'
+    Write-Host '  • Run TKA-02 (Toolkit integrity check) if tools are missing or fail to load'
+    Write-Host '  • Run TKA-03 (Toolkit diagnostics) for a full report'
     Write-Host "  • Check $Script:LogDir\toolkit.log for details"
     Write-Host "  • Check $Script:LogDir\toolkit-errors.json for errors"
     Write-Host ''

@@ -21,6 +21,7 @@ function Invoke-Tool {
     } else {
         Write-Log "RUN $($Tool.Id) $($Tool.Name)"
         Write-ToolUsage -ToolId $Tool.Id -ToolName $Tool.Name -Category $Tool.Category
+        $timer = [System.Diagnostics.Stopwatch]::StartNew()
         try {
             & $Tool.Action | Out-Host
             Log-AuditEvent -Action $Tool.Name -ToolId $Tool.Id -Target $env:COMPUTERNAME -Status 'Success'
@@ -36,6 +37,13 @@ function Invoke-Tool {
             Write-ErrorLog -ToolId $Tool.Id -ToolName $Tool.Name -ErrorRecord $_
             Write-Log "ERROR $($Tool.Id): $($_.Exception.Message)"
             Log-AuditEvent -Action $Tool.Name -ToolId $Tool.Id -Target $env:COMPUTERNAME -Status 'Failed' -Details $_.Exception.Message
+            $Script:ExecutionStats.ToolsFailed++
+        }
+        finally {
+            # Session statistics (REC-01, REC-03). Nothing used to count runs, so they
+            # showed "Tools Executed: 0" and, after a failure, a negative success rate.
+            $Script:ExecutionStats.ToolsRun++
+            $Script:ExecutionStats.TotalExecutionSeconds += $timer.Elapsed.TotalSeconds
         }
     }
     Write-Host ''

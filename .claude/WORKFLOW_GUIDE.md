@@ -9,23 +9,22 @@
 git checkout -b feature/your-name
 
 # 2. Make changes & test locally
-# Edit files, then test:
-.\Toolkit\Launch-GUI.bat
-# or
+.\Tests\Test-ToolRegistration.ps1       # every module loads, IDs valid, README counts right
 .\Toolkit\HelpdeskToolkit.ps1 -Run TOOL-ID
+.\Toolkit\Launch-GUI.bat
 
 # 3. Commit changes
 git add .
-git commit -m "Clear description of what changed"
+git commit -m "fix: clear description of what changed"
 
 # 4. Push to remote
 git push -u origin feature/your-name
 
-# 5. Create PR on GitHub web interface
-# https://github.com/TechieJustin86/IT-Helpdesk-Toolkit/compare
+# 5. Open a PR
+gh pr create --base master
 
-# 6. Approve your own PR (you're the code owner)
-# 7. Merge when ready
+# 6. Wait for the "Validate PowerShell" check to pass, then merge
+gh pr merge <number> --squash --admin --delete-branch
 ```
 
 ---
@@ -42,14 +41,14 @@ git push -u origin feature/your-name
 - Find and fix bugs in the code
 - Add new tools/features to appropriate modules
 - Update documentation
-- Commit changes to feature branch
-- Push the branch
-- Provide PR URL ready for you to review
+- Scan every change for credentials, real server names and other private details before committing (see `CLAUDE.md`)
+- Commit to a feature branch, push it, and open the PR
+- Merge only when you say so
 
 ### ✅ You Handle:
-- Creating/approving the PR on GitHub
+- Reviewing the PR
 - Final testing before merge
-- Merging when ready
+- Saying when to merge
 
 ---
 
@@ -58,7 +57,7 @@ git push -u origin feature/your-name
 ### Step 1: Create Feature Branch
 
 ```powershell
-cd D:\Projects\Git_PS_IT_Helpdesk_Toolkit
+cd <your clone of IT-Helpdesk-Toolkit>
 
 # For fixes:
 git checkout -b fix/brief-description
@@ -71,6 +70,11 @@ git checkout -b feature/brief-description
 
 ### Step 2: Work & Test Locally
 
+**Check the registry:**
+```powershell
+.\Tests\Test-ToolRegistration.ps1
+```
+
 **Test the GUI:**
 ```powershell
 .\Toolkit\Launch-GUI.bat
@@ -82,6 +86,8 @@ git checkout -b feature/brief-description
 .\Toolkit\HelpdeskToolkit.ps1 -List      # See all tools
 .\Toolkit\HelpdeskToolkit.ps1 -Run SYS-01  # Run a specific tool
 ```
+
+If the tool reads system state, try it both elevated and as a standard user.
 
 ### Step 3: Commit Changes
 
@@ -98,7 +104,7 @@ Explain what changed and why."
 
 **Good commit messages:**
 - ✅ `fix: SET-01 opens settings with Invoke-Item instead of &`
-- ✅ `feature: add SYS-14 hardware diagnostics tool`
+- ✅ `feat: add NET-32 subnet scanner tool`
 - ✅ `docs: update README with new feature explanation`
 
 **Bad commit messages:**
@@ -116,18 +122,22 @@ git push -u origin feature/your-branch-name
 
 ### Step 5: Create PR on GitHub
 
-1. Go to: https://github.com/TechieJustin86/IT-Helpdesk-Toolkit/compare
-2. GitHub will suggest your branch → click "Create pull request"
-3. Add title & description
-4. Click "Create pull request"
+```powershell
+gh pr create --base master
+```
 
-### Step 6: Approve & Merge
+Or on the web: https://github.com/TechieJustin86/IT-Helpdesk-Toolkit/compare
 
-Since you're the code owner:
-1. GitHub will ask for your approval (CODEOWNERS requirement)
-2. Click "Approve"
-3. Click "Merge pull request"
-4. Delete the branch (GitHub offers this)
+### Step 6: Merge
+
+`master` requires one approving review, and GitHub does not let you approve your own pull request. As the only admin, you merge with the admin override:
+
+```powershell
+gh pr checks <number>                                   # wait for "Validate PowerShell: pass"
+gh pr merge <number> --squash --admin --delete-branch
+```
+
+The checks are not a required status on `master`, so the override merges even while they are still running or failing. Wait for them first.
 
 ### Step 7: Clean Up Locally
 
@@ -161,6 +171,7 @@ git checkout -b fix/set-01-settings-error
 # 4. Fix the issue
 
 # 5. Test it
+.\Tests\Test-ToolRegistration.ps1
 .\Toolkit\Launch-GUI.bat
 # Navigate to SET-01, test the fix
 
@@ -171,10 +182,8 @@ git commit -m "fix: SET-01 opens settings file with Invoke-Item
 Changed from & operator (execute) to Invoke-Item (open in editor).
 Added Path validation to prevent empty string error."
 
-# 7. Push
+# 7. Push, open the PR, and merge once the check passes
 git push -u origin fix/set-01-settings-error
-
-# 8. Create PR on GitHub and merge
 ```
 
 ### Adding a New Tool
@@ -186,19 +195,18 @@ git checkout -b feature/add-network-scanner
 # 2. Edit appropriate module
 # Open Toolkit\Modules\03-Network.ps1
 
-# 3. Add tool using Add-Tool helper
-Add-Tool -Id 'NET-30' -Category 'Network' -Name 'Network Scanner' ...
+# 3. Add tool using Add-Tool, with an ID nothing else uses
+Add-Tool -Id 'NET-32' -Category 'Network' -Name 'Network Scanner' ...
 
-# 4. Test it
+# 4. Test it - the registration test also tells you the new README counts
+.\Tests\Test-ToolRegistration.ps1
 .\Toolkit\Launch-GUI.bat
-# Find the new tool in Network category, test it
 
-# 5. Commit
+# 5. Commit, including the README tools table and counts
 git add .
-git commit -m "feature: add NET-30 Network Scanner tool
+git commit -m "feat: add NET-32 Network Scanner tool
 
-New network diagnostic tool that scans for active hosts on subnet.
-Includes configurable timeout and CIDR range support."
+New network diagnostic tool that scans for active hosts on subnet."
 
 # 6. Push and create PR
 ```
@@ -208,33 +216,35 @@ Includes configurable timeout and CIDR range support."
 ## File Locations to Remember
 
 ```
-D:\Projects\Git_PS_IT_Helpdesk_Toolkit\
+IT-Helpdesk-Toolkit\
 ├── Toolkit\                         # Self-contained: copy to a flash drive to run anywhere
 │   ├── Launch-GUI.bat               # Double-click to start
 │   ├── HelpdeskToolkit.ps1          # Console entry point
 │   ├── HelpdeskToolkit-GUI.ps1      # GUI entry point
 │   ├── Core\                        # Shared helpers, config, dependencies, audit log
 │   ├── Modules\                     # Feature modules (one per category)
+│   ├── Logs\                        # Action log, error log, audit trail (git-ignored)
 │   └── Stand alone scripts\         # Independent tools
+├── Tests\Test-ToolRegistration.ps1  # Load test run by CI
 ├── docs\                            # ARCHITECTURE, GUIDE, CHANGELOG
+├── CLAUDE.md                        # Rules Claude follows in this repo
 └── .claude\WORKFLOW_GUIDE.md        # This file
 ```
 
 ---
 
-## GitHub Security Setup (What's Already Done)
+## GitHub Setup (What's Already Done)
 
-✅ **Branch Protection** - All PRs need approval  
-✅ **CODEOWNERS** - Your approval required  
-✅ **PowerShell Syntax Check** - Auto-validates all files  
-✅ **Dependabot** - Scans for vulnerable dependencies  
-✅ **Secret Scanning** - Detects exposed secrets  
+✅ **Branch protection** - `master` needs a PR with one approving review; the admin override bypasses it
+✅ **CODEOWNERS** - you own every path
+✅ **PowerShell checks** - syntax, file encoding, the registration test and PSScriptAnalyzer run on PRs that change a `.ps1` file or `README.md`
+✅ **Secret scanning and push protection** - GitHub blocks pushes containing known secret formats
+ℹ️ **Dependabot** - security updates are enabled, but the repo has no package manifests, so there is nothing for it to scan
 
 **What this means for you:**
-- All changes go through PR review (even yours)
-- Syntax is automatically checked
-- Security is verified
-- Complete audit trail of changes
+- All changes go through a PR (even yours)
+- Scripts are checked automatically, but the check is not required, so wait for it before merging
+- Known secret formats are caught by GitHub; everything else relies on checking before you commit
 
 ---
 
@@ -249,11 +259,13 @@ git push -u origin fix/your-issue
 ```
 
 ### "PR status check failing"
-PowerShell syntax error detected.
-- Check the error message in GitHub Actions
-- Fix the syntax error
-- Push the fix to the same branch
-- PR updates automatically
+Open the failed step in GitHub Actions. It will be one of:
+- **Validate PowerShell Syntax** - a script doesn't parse
+- **Check file encoding** - a script has non-ASCII characters but no BOM; save it as UTF-8 with BOM
+- **Tool registration** - a module failed to load, a tool ID is duplicated or malformed, or the README counts don't match
+- **PSScriptAnalyzer** - an Error-severity finding
+
+Fix it and push to the same branch; the PR updates automatically.
 
 ### "Forgot which branch I'm on"
 ```powershell
@@ -271,8 +283,8 @@ git checkout feature/other-name  # Switch to another branch
 
 ## Version Info
 
-- **Last Updated:** 2026-10-06
-- **Toolkit Version:** 1.5.0
+- **Last Updated:** 2026-10-19
+- **Toolkit Version:** 1.5.0 (plus the changes under "Unreleased" in docs\CHANGELOG.md)
 - **Repository:** https://github.com/TechieJustin86/IT-Helpdesk-Toolkit
 
 ---

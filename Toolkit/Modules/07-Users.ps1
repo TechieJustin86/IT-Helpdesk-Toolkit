@@ -168,8 +168,13 @@ Add-Tool -Id 'USR-11' -Category 'Users & Accounts' -Name 'Logon history' -Admin 
 }
 
 Add-Tool -Id 'USR-12' -Category 'Users & Accounts' -Name 'Delete local user' -Admin -Description 'Permanently remove a local account (built-in and current accounts are protected)' -Action {
-    # Built-in accounts by SID suffix: 500 Administrator, 501 Guest, 503 DefaultAccount, 504 WDAGUtilityAccount
-    $protected = { param($u) $u.SID.Value -match '-(500|501|503|504)$' -or $u.Name -eq $env:USERNAME -or $u.Name -eq 'defaultuser0' }
+    # Built-in accounts by SID suffix: 500 Administrator, 501 Guest, 503 DefaultAccount, 504 WDAGUtilityAccount.
+    # $env:USERNAME is the account running the toolkit, which after elevation with a separate
+    # admin account is that admin - not the person signed in at the PC - so the console
+    # user is protected as well.
+    $consoleUser = "$((Get-CimInstance Win32_ComputerSystem -ErrorAction SilentlyContinue).UserName)".Split('\')[-1]
+    $protected = { param($u) $u.SID.Value -match '-(500|501|503|504)$' -or $u.Name -eq $env:USERNAME -or
+                   ($consoleUser -and $u.Name -eq $consoleUser) -or $u.Name -eq 'defaultuser0' }
     $users = @(Get-LocalUser | Where-Object { -not (& $protected $_) })
     if (-not $users.Count) { Write-Info 'No local accounts can be deleted (built-in and signed-in accounts are protected).'; return }
     $u = Select-FromList $users { '{0,-24} Enabled={1,-5} Last logon: {2}' -f $_.Name, $_.Enabled, $_.LastLogon } 'Account to delete'

@@ -359,17 +359,39 @@ Add-Tool -Id 'SEC-19' -Category 'Security' -Name 'TPM status' -Description 'Trus
     Write-Section 'TPM (Trusted Platform Module) Status'
 
     try {
+        # Win32_Tpm has the detail but answers only administrators. For a standard user it
+        # is "Access denied", which this used to report as "No TPM" with advice to go into
+        # the BIOS. Get-Tpm is no fallback: for a standard user it returns an object with
+        # every field empty, so TpmPresent reads as false. Device Manager answers anyone,
+        # so it decides presence (and the version, from the device name) when Win32_Tpm can't.
         $tpm = Get-CimInstance -Namespace root\cimv2\security\microsofttpm -ClassName Win32_Tpm -ErrorAction SilentlyContinue
-        if (-not $tpm) {
-            Write-Warn 'No TPM detected or not accessible'
-            Write-Info 'Check BIOS settings - TPM may need to be enabled'
+        $device = Get-PnpDevice -Class SecurityDevices -ErrorAction SilentlyContinue |
+            Where-Object { $_.FriendlyName -like '*Trusted Platform Module*' -and $_.Present } | Select-Object -First 1
+
+        if (-not $tpm -and -not $device) {
+            if (Test-IsAdmin) {
+                Write-Warn 'No TPM detected'
+                Write-Info 'Check BIOS settings - TPM may need to be enabled'
+            } else {
+                Write-Warn 'Could not find a TPM from this account'
+                Write-Info 'Run as Administrator to check properly before concluding there is none'
+            }
             return
         }
 
         Write-Check 'OK' 'TPM Present' 'Yes'
-        Write-Check 'INFO' 'Manufacturer' $tpm.ManufacturerIdTxt
-        Write-Check 'INFO' 'Version' "2.0 (driver reported)"
-        Write-Check 'INFO' 'Specification Version' $tpm.SpecVersion
+        if ($tpm) {
+            Write-Check 'INFO' 'Manufacturer' $tpm.ManufacturerIdTxt
+            # SpecVersion reads like "2.0, 0, 1.59"; the first part is the TPM version.
+            # (This used to print a fixed "2.0" for every TPM, 1.2 chips included.)
+            Write-Check 'INFO' 'Version' (("$($tpm.SpecVersion)" -split ',')[0].Trim())
+            Write-Check 'INFO' 'Specification Version' $tpm.SpecVersion
+        } else {
+            $version = if ($device.FriendlyName -match '(\d+\.\d+)') { $matches[1] } else { 'unknown' }
+            Write-Check 'INFO' 'Version' $version
+            Write-Check $(if ($device.Status -eq 'OK') { 'OK' } else { 'WARN' }) 'Device status' $device.Status
+            Write-Info 'Run as Administrator for the manufacturer and specification details'
+        }
 
         # Check BitLocker readiness
         $bitlocker = Get-BitLockerVolume -MountPoint $env:SystemDrive -ErrorAction SilentlyContinue

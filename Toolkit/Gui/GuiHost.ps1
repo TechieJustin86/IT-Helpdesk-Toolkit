@@ -159,6 +159,7 @@ function Invoke-GuiTool {
     $Script:CurrentTool = $tool
     Write-Log "RUN $($tool.Id) $($tool.Name) (GUI)"
     Write-ToolUsage -ToolId $tool.Id -ToolName $tool.Name -Category $tool.Category
+    $timer = [System.Diagnostics.Stopwatch]::StartNew()
     try {
         & $tool.Action 2>&1 3>&1 | ForEach-Object {
             if ($_ -is [System.Management.Automation.ErrorRecord]) {
@@ -179,6 +180,12 @@ function Invoke-GuiTool {
         Write-ErrorLog -ToolId $tool.Id -ToolName $tool.Name -ErrorRecord $_
         Write-Log "ERROR $($tool.Id): $($_.Exception.Message)"
         Log-AuditEvent -Action $tool.Name -ToolId $tool.Id -Target $env:COMPUTERNAME -Status 'Failed' -Details $_.Exception.Message
+        $Script:ExecutionStats.ToolsFailed++
+    } finally {
+        # Session statistics, as in Invoke-Tool. The GUI's runspace lives for the whole
+        # session, so these accumulate across every tool run in the window.
+        $Script:ExecutionStats.ToolsRun++
+        $Script:ExecutionStats.TotalExecutionSeconds += $timer.Elapsed.TotalSeconds
     }
     $Script:CurrentTool = $null
 }

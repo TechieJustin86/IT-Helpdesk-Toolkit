@@ -303,14 +303,14 @@ Add-Tool -Id 'RPT-09' -Category 'Reports' -Name 'Event log health report' -Descr
                 StartTime = $startTime
             } -MaxEvents 500 -ErrorAction SilentlyContinue)
 
-            foreach ($event in $events) {
+            foreach ($evt in $events) {
                 $allEvents += [pscustomobject]@{
                     LogName = $logName
-                    TimeCreated = $event.TimeCreated
-                    Level = $event.LevelDisplayName
-                    ProviderName = $event.ProviderName
-                    EventId = $event.Id
-                    Message = "$($event.Message)".Substring(0, [math]::Min(200, "$($event.Message)".Length))
+                    TimeCreated = $evt.TimeCreated
+                    Level = $evt.LevelDisplayName
+                    ProviderName = $evt.ProviderName
+                    EventId = $evt.Id
+                    Message = "$($evt.Message)".Substring(0, [math]::Min(200, "$($evt.Message)".Length))
                 }
             }
         } catch { }

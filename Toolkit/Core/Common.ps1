@@ -139,9 +139,8 @@ function Write-ErrorLog {
         $maxErrors = Get-ConfigValue -Category 'Logging' -Setting 'MaxErrorsToKeep'
         if (-not $maxErrors) { $maxErrors = 200 }
         Add-JsonLogEntry -Path $Script:ErrorLogFile -Entry $errorEntry -MaxEntries $maxErrors -Depth 6
-
-        # Update stats
-        $Script:ExecutionStats.ToolsFailed++
+        # Run and failure counts are kept by the tool runners, not here: one failing run can
+        # log several errors, which made "Tools Failed" exceed "Tools Executed"
     } catch { }
 }
 
@@ -591,9 +590,13 @@ function Get-ExecutionStats {
 
 function Show-ExecutionStats {
     Write-Section 'Execution Statistics (This Session)'
+    if (-not $Script:ExecutionStats.ToolsRun) {
+        Write-Info 'No other tools have run yet this session'
+        return
+    }
     Write-Info "Tools Executed: $($Script:ExecutionStats.ToolsRun)"
     Write-Info "Tools Failed: $($Script:ExecutionStats.ToolsFailed)"
-    Write-Info "Success Rate: $([math]::Round(($Script:ExecutionStats.ToolsRun - $Script:ExecutionStats.ToolsFailed) / [math]::Max(1, $Script:ExecutionStats.ToolsRun) * 100, 1))%"
+    Write-Info "Success Rate: $([math]::Round(($Script:ExecutionStats.ToolsRun - $Script:ExecutionStats.ToolsFailed) / $Script:ExecutionStats.ToolsRun * 100, 1))%"
     if ($Script:ExecutionStats.TotalExecutionSeconds -gt 0) {
         $avgTime = $Script:ExecutionStats.TotalExecutionSeconds / [math]::Max(1, $Script:ExecutionStats.ToolsRun)
         Write-Info "Average Execution Time: $([math]::Round($avgTime, 2))s"
