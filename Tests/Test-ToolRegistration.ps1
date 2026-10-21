@@ -35,7 +35,7 @@ Write-Host '----------------------' -ForegroundColor DarkGray
 
 $Script:ModuleErrors = @()
 
-$coreOrder = @('Common.ps1', 'Config.ps1', 'Dependencies.ps1', 'Validation.ps1', 'SecurityManagement.ps1')
+$coreOrder = @('Common.ps1', 'Config.ps1', 'Dependencies.ps1', 'SecurityManagement.ps1')
 
 foreach ($file in $coreOrder) {
     $path = Join-Path $coreDir $file
@@ -101,6 +101,24 @@ foreach ($tool in $tools) {
     }
 }
 if ($aliasCount) { Write-Host "  aliases: $aliasCount former ID(s) declared" -ForegroundColor DarkGray }
+
+# --- Dependency gating lists (Core\Dependencies.ps1) ------------------------
+# The gate only stops tools it lists. A removed or renamed tool left in a list is
+# silently ignored, and a tool missing from one fails deep inside itself instead of
+# showing the install hint - the AD list once stopped at AD-09.
+
+$gateFor  = @{ 'ActiveDirectory' = 'Active Directory'; 'GraphPowerShell' = 'Microsoft 365' }
+$neverGated = @('AD-01', 'AD-02', 'M365-01', 'M365-02')   # status and installer tools
+foreach ($key in $gateFor.Keys) {
+    $listed = @($Script:Dependencies[$key].ToolIds)
+    foreach ($id in $listed) {
+        if (-not $liveIds.ContainsKey($id)) { Add-Failure "Dependency '$key' lists '$id', which is not a live tool ID" }
+        if ($neverGated -contains $id)      { Add-Failure "Dependency '$key' gates $id, which must stay runnable to diagnose or install it" }
+    }
+    foreach ($tool in ($tools | Where-Object { $_.Category -eq $gateFor[$key] -and $neverGated -notcontains $_.Id })) {
+        if ($listed -notcontains $tool.Id) { Add-Failure "$($tool.Id) is a '$($gateFor[$key])' tool but is not gated on $key" }
+    }
+}
 
 # --- Helpers the modules rely on ------------------------------------------
 
