@@ -3,11 +3,10 @@ name: PowerShell Checks
 on:
   push:
     branches: [ master, develop ]
-    # README.md is included because the tool-registration test checks the counts it advertises
-    paths: [ '**.ps1', 'README.md', '.github/workflows/powershell-check.yml' ]
+  # No paths filter: "Validate PowerShell" is a required check on master, and a PR
+  # whose files a filter skips would wait for it forever.
   pull_request:
     branches: [ master, develop ]
-    paths: [ '**.ps1', 'README.md', '.github/workflows/powershell-check.yml' ]
 
 jobs:
   syntax-check:

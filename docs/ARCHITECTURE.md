@@ -16,10 +16,9 @@ Project Root/
 │   ├── Build-SingleFile.ps1     # Builds standalone copies into dist/ (generated, git-ignored)
 │   │
 │   ├── Core/                    # Foundation modules (loaded first)
-│   │   ├── Common.ps1           # Helpers, logging, JSON log files, tool registration and lookup
-│   │   ├── Config.ps1           # Configuration defaults (see "Configuration" below)
+│   │   ├── Common.ps1           # Helpers, logging, JSON log files, confirmations, tool registration and lookup
+│   │   ├── Config.ps1           # The one setting (see "Configuration" below)
 │   │   ├── Dependencies.ps1     # Optional-module tracking and the dependency gate
-│   │   ├── Validation.ps1       # Confirm-DestructiveAction, plus input validators
 │   │   ├── SecurityManagement.ps1  # Audit trail
 │   │   └── Menu.ps1             # Console menu and the console tool runner
 │   │
@@ -31,7 +30,7 @@ Project Root/
 │   │   ├── 05-AppsOffice.ps1       # 13 apps/Office tools
 │   │   ├── 06-Security.ps1         # 20 security tools
 │   │   ├── 07-Users.ps1            # 12 user management tools
-│   │   ├── 08-ActiveDirectory.ps1  # 23 AD tools (optional module)
+│   │   ├── 08-ActiveDirectory.ps1  # 22 AD tools (optional module)
 │   │   ├── 09-Microsoft365.ps1     # 15 M365 tools (optional module)
 │   │   ├── 10-Troubleshooting.ps1  # 22 troubleshooting tools
 │   │   ├── 11-Remote.ps1           # 12 remote operation tools
@@ -44,7 +43,7 @@ Project Root/
 │   │   ├── 19-DailyTools.ps1       # 6 daily tools
 │   │   ├── 20-Analytics.ps1        # 3 analytics tools
 │   │   ├── 21-Developer.ps1        # 7 developer tools
-│   │   ├── 22-Settings.ps1         # 4 settings tools
+│   │   ├── 22-Settings.ps1         # 3 settings tools
 │   │   ├── 23-Recommendations.ps1  # 4 diagnostic tools
 │   │   └── 24-Toolkit-Admin.ps1    # 6 admin tools
 │   │
@@ -71,10 +70,9 @@ The module numbers skip 12; files load in name order, so the gap has no effect.
 1. **Common.ps1** - Helpers, logging, tool registration
 2. **Config.ps1** - Settings
 3. **Dependencies.ps1** - Optional-module tracking
-4. **Validation.ps1** - Confirmation and validation helpers
-5. **SecurityManagement.ps1** - Audit trail (needs Config and Common)
-6. **Menu.ps1** - Console menu (needs all Core modules)
-7. **01-SystemInfo through 24-Toolkit-Admin** - Feature modules, in file-name order
+4. **SecurityManagement.ps1** - Audit trail (needs Common)
+5. **Menu.ps1** - Console menu (needs all Core modules)
+6. **01-SystemInfo through 24-Toolkit-Admin** - Feature modules, in file-name order
 
 A module that throws while loading is skipped and reported; the rest of the toolkit still loads.
 
@@ -95,24 +93,20 @@ Because of this, a tool is written once and works unchanged in both front ends. 
 ## Core Module Functions
 
 ### Common (Common.ps1)
-**Purpose:** Foundation helpers and tool registration
-**Key Functions:** Add-Tool, Get-ToolById, Resolve-ToolId, Test-IsAdmin, Write-Ok / Write-Info / Write-Warn / Write-Err / Write-Section / Write-Check, Write-Log, Write-ErrorLog, Get-JsonLogEntries, Add-JsonLogEntry, Set-JsonLogEntries, Get-OutFile, Invoke-External, Get-WingetPath, Get-SystemSummary, Get-MemoryMetrics, Show-ResourceStats, Show-ExecutionStats
+**Purpose:** Foundation helpers, confirmations and tool registration
+**Key Functions:** Add-Tool, Get-ToolById, Resolve-ToolId, Test-IsAdmin, Confirm-Action, Confirm-DestructiveAction (the user must type `yes`), Select-FromList, Write-Ok / Write-Info / Write-Warn / Write-Err / Write-Section / Write-Check, Write-Log, Write-ErrorLog, Get-JsonLogEntries, Add-JsonLogEntry, Set-JsonLogEntries, Get-OutFile, Invoke-External, Get-WingetPath, Get-SystemSummary, Get-MemoryMetrics, Show-ResourceStats, Show-ExecutionStats
 
 ### Config (Config.ps1)
-**Purpose:** Configuration defaults
+**Purpose:** The toolkit's one setting (see "Configuration")
 **Key Functions:** Get-ToolkitConfig, Get-ConfigValue
 
 ### Dependencies (Dependencies.ps1)
 **Purpose:** Track optional modules, and gate tools whose module is missing
-**Key Functions:** Get-UnmetToolDependency, Test-DependencyMet, Clear-DependencyState, Test-ModuleAvailable, Show-MissingDependencies
-
-### Validation (Validation.ps1)
-**Purpose:** Confirmation for irreversible actions
-**Key Functions:** Confirm-DestructiveAction. The file also holds input validators (`Test-ValidIPAddress`, `Test-ValidComputerName`, `Validate-ComputerNameInput` and others) that no tool currently calls.
+**Key Functions:** Get-UnmetToolDependency, Test-DependencyMet, Clear-DependencyState, Test-ModuleAvailable
 
 ### SecurityManagement (SecurityManagement.ps1)
 **Purpose:** The audit trail
-**Key Functions:** Log-AuditEvent. The file also holds credential-caching, masking and remote-confirmation functions that no tool currently calls, so the toolkit stores no credentials and masks nothing.
+**Key Functions:** Log-AuditEvent. The toolkit stores no credentials.
 
 ## Data Storage
 
@@ -205,21 +199,21 @@ These JSON files are arrays, and they must be read with `Get-JsonLogEntries` and
 
 ## Configuration
 
-Defaults live in `Toolkit\Core\Config.ps1`, and TKA-01 shows them. One setting is read today:
+`Toolkit\Core\Config.ps1` holds one setting, and TKA-01 shows it. There is no settings file: to change the value, edit it in `Config.ps1`.
 
 ```powershell
 $Script:Config.Logging.MaxErrorsToKeep = 200  # Entries kept in toolkit-errors.json
 ```
 
-The other sections - `Timeouts`, `Retry`, `Resources`, `Performance` and `Security` - are not read by any code. Most were added for the Cache, ResourceManagement and ErrorHandling modules, which were removed because nothing called them; `Security.RequireConfirmDestructive` is read only by a function that nothing calls. They remain so settings files written by older versions still load. Remote tools that connect through CIM use a fixed 20-second timeout.
+Remote tools that connect through CIM use a fixed 20-second timeout.
 
 ## Checks
 
-`.github/workflows/powershell-check.yml` runs on pull requests and pushes to `master` that change a `.ps1` file, `README.md` or the workflow itself. A change to other docs alone does not run it.
+`.github/workflows/powershell-check.yml` runs on every pull request and every push to `master`. Its job, **Validate PowerShell**, is a required check: a repository ruleset with no bypass blocks a merge into `master` until it passes, admin merges included.
 
 1. **Syntax** - every `.ps1` must parse.
 2. **File encoding** - any `.ps1` containing non-ASCII text must be saved as UTF-8 with a byte order mark, because Windows PowerShell 5.1 reads a file without one as Windows-1252 and shows garbled text.
-3. **Tool registration** - `Tests\Test-ToolRegistration.ps1` loads every module in the real order and checks load errors, duplicate or malformed IDs, aliases, required helpers, and that the counts in `README.md` match the code.
+3. **Tool registration** - `Tests\Test-ToolRegistration.ps1` loads every module in the real order and checks load errors, duplicate or malformed IDs, aliases, that the dependency lists name only live tools and gate every AD and M365 tool except the status and installer ones, required helpers, and that the counts in `README.md` match the code.
 4. **PSScriptAnalyzer** - fails on Error-severity findings and lists warnings.
 
 Run the registration test locally after changing a module:

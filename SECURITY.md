@@ -130,7 +130,7 @@ When we receive a security report:
 
 ## Security Checks
 
-Every pull request that changes a `.ps1` file or `README.md` runs these checks in GitHub Actions:
+Every pull request runs these checks in GitHub Actions, and nothing merges into `master` until they pass:
 
 - Every script must parse
 - Scripts containing non-ASCII text must be saved as UTF-8 with BOM

@@ -35,6 +35,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Add-Tool` takes `-Aliases`; `Get-ToolById` and `Resolve-ToolId` resolve former IDs.
 - The SET-03 and TKA-06 "About" screens read the version and counts live, and list only
   what the toolkit does.
+- TKA-01 "Toolkit configuration" lists whatever `Config.ps1` defines, instead of fixed
+  tables of settings nothing read.
+- **The checks run on every pull request and must pass before anything merges into
+  `master`**, admin merges included. They used to run only when a `.ps1` file or
+  `README.md` changed, and a merge could go ahead while they were failing.
 
 ### Added
 - **The audit trail records every tool run** - who, which computer, when, elevated or
@@ -44,8 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stop with one clear line and an install hint, instead of failing deep inside the tool.
   The status and installer tools (AD-01, AD-02, M365-01, M365-02) are never gated.
 - **`Tests\Test-ToolRegistration.ps1`**: loads every module and checks load errors,
-  duplicate or malformed tool IDs, aliases, required helpers, and the counts in
-  `README.md`. CI runs it, together with PSScriptAnalyzer and a file-encoding check.
+  duplicate or malformed tool IDs, aliases, the dependency gating lists, required helpers,
+  and the counts in `README.md`. CI runs it, together with PSScriptAnalyzer and a file-encoding check.
 - `Get-JsonLogEntries`, `Add-JsonLogEntry` and `Set-JsonLogEntries` in `Common.ps1` for the
   toolkit's JSON logs, and `Get-WingetPath` for finding winget.
 - README sections on running from a flash drive and on standard-user vs. Administrator
@@ -107,7 +112,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `WinRM` dependency entry named the Windows feature `WinRM-IIS-Ext`, which is the IIS
   extension and not WinRM. It was removed rather than wired up, since gating on it would
   have blocked all ten remote tools on machines where remoting works.
-- The AD dependency list stopped at AD-09 and omitted AD-20 through AD-33.
+- The AD dependency list stopped at AD-09 and omitted AD-20 and later.
 - `Test-RemoteComputerWinRM` passed `New-PSSession` a parameter it does not have, so it
   returned "unreachable" for every computer. Nothing called it yet.
 
@@ -132,12 +137,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The "Future Roadmap" section of this changelog. Several items contradicted the current
   design, such as a SQLite cache after the cache was removed as unused, or Linux and
   macOS support for a toolkit built on WMI and the Windows registry.
+- **Code nothing called (292 -> 290 tools):**
+  - `Core\Validation.ps1`: the input validators no tool used. `Confirm-DestructiveAction`,
+    the one function in use, moved to `Common.ps1`.
+  - From `SecurityManagement.ps1`: credential caching, log masking, remote-operation
+    confirmation and the security summary. The file now holds only the audit trail.
+  - From `Config.ps1`: the `Timeouts`, `Retry`, `Resources`, `Performance` and `Security`
+    sections, and `Set-ToolkitConfig`. An earlier note here said they were kept so older
+    settings files still load; that was wrong, because `Config.ps1` never loaded a file.
+  - **SET-01 "Toolkit settings"**, which wrote `Toolkit\Settings\toolkit-settings.json`.
+    Nothing read that file, so its settings changed nothing. A copy left by an older
+    version can be deleted.
+  - **AD-33 "AD Self-Service Plus registry config"**. It set one `Enabled` value under a
+    Quest ActiveRoles policy key, a different product from the one in its name, and
+    did nothing else.
+
+  SET-01 and AD-33 are not aliases; `-Run SET-01` or `-Run AD-33` reports an unknown tool.
 
 ### Known issues
-- Of the settings in `Config.ps1`, only `Logging.MaxErrorsToKeep` is read; the rest are
-  kept so older settings files still load. SET-01's settings file is not read at all.
-- `Validation.ps1` and `SecurityManagement.ps1` contain functions no tool calls,
-  including credential caching and log masking.
 - When elevated with a separate admin account, tools that work on per-user data act on
   the admin's profile. See the README.
 
@@ -147,8 +164,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > ResourceManagement and ErrorHandling modules were added, but nothing called them, so
 > the caching and parallel-job speedups, retries and resource limits did not happen; the
 > modules have since been removed (see Unreleased). The credential caching and log
-> masking in SecurityManagement are not called by any tool, and the audit trail recorded
-> nothing until it was connected under Unreleased.
+> masking in SecurityManagement were never called by any tool and have since been
+> removed, and the audit trail recorded nothing until it was connected under Unreleased.
 
 ### Added
 - **Core Modules (8 new)**:

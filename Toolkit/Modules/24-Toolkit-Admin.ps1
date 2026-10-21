@@ -2,27 +2,21 @@
 # Category: Toolkit Administration
 # Configuration, maintenance, and troubleshooting for the toolkit itself.
 
-Add-Tool -Id 'TKA-01' -Category 'Toolkit Administration' -Name 'Toolkit configuration' -Description 'View and modify toolkit settings' -Tags @('settings','configuration') -Action {
+Add-Tool -Id 'TKA-01' -Category 'Toolkit Administration' -Name 'Toolkit configuration' -Description 'View the toolkit''s settings and where to change them' -Tags @('settings','configuration') -Action {
     Write-Section 'Toolkit Configuration'
 
+    # Lists whatever Config.ps1 defines, so this view cannot drift from it again. It used
+    # to print fixed Timeout, Resource, Performance and Security tables, none of which
+    # any code read; those sections have been removed from Config.ps1.
     $config = Get-ToolkitConfig
+    foreach ($section in ($config.Keys | Sort-Object)) {
+        foreach ($setting in ($config[$section].Keys | Sort-Object)) {
+            Write-Check 'INFO' "$section.$setting" "$($config[$section][$setting])"
+        }
+    }
 
     Write-Host ''
-    Write-Section 'Timeout Settings (seconds)'
-    $config.Timeouts | Format-Table -AutoSize | Out-Host
-
-    Write-Section 'Resource Limits'
-    $config.Resources | Format-Table -AutoSize | Out-Host
-
-    Write-Section 'Performance Settings'
-    $config.Performance | Format-Table -AutoSize | Out-Host
-
-    Write-Section 'Security Settings'
-    $config.Security | Format-Table -AutoSize | Out-Host
-
-    # Saying "edit Config.ps1" alone implied every value above takes effect; only one does
-    Write-Info 'Only Logging.MaxErrorsToKeep changes the toolkit''s behaviour today. The other values are not read.'
-    Write-Info 'To change it, edit Core\Config.ps1'
+    Write-Info 'To change a setting, edit its value in Core\Config.ps1.'
 }
 
 Add-Tool -Id 'TKA-02' -Category 'Toolkit Administration' -Name 'Toolkit integrity check' -Description 'Required files present, every script parses, modules loaded, and tools registered per category' -Tags @('maintenance','integrity') -Aliases @('SET-04', 'DEV-02') -Action {
@@ -37,7 +31,7 @@ Add-Tool -Id 'TKA-02' -Category 'Toolkit Administration' -Name 'Toolkit integrit
     $required = @(
         'HelpdeskToolkit.ps1', 'HelpdeskToolkit-GUI.ps1', 'Gui\GuiHost.ps1',
         'Core\Common.ps1', 'Core\Config.ps1', 'Core\Dependencies.ps1',
-        'Core\Validation.ps1', 'Core\SecurityManagement.ps1', 'Core\Menu.ps1'
+        'Core\SecurityManagement.ps1', 'Core\Menu.ps1'
     )
     foreach ($rel in $required) {
         if (Test-Path -LiteralPath (Join-Path $Script:ToolkitDir $rel)) { Write-Check 'OK' $rel 'Found' }

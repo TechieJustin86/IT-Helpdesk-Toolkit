@@ -5,7 +5,7 @@
     Tracks which tools require optional modules (Active Directory, Microsoft Graph).
     Validates prerequisites before tool execution and provides installation guidance.
 .PREREQUISITES
-    - ActiveDirectory: RSAT module for the AD tools (21 gated tools)
+    - ActiveDirectory: RSAT module for the AD tools (20 gated tools)
     - GraphPowerShell: Microsoft.Graph for the M365 tools (13 gated tools)
 .FUNCTIONS
     - Test-ModuleAvailable: Check if module is installed
@@ -38,7 +38,7 @@ $Script:Dependencies = @{
         InstallNote = 'Run AD-02 to install the RSAT ActiveDirectory module (AD-01 shows the current status).'
         ToolIds = @('AD-03', 'AD-04', 'AD-05', 'AD-06', 'AD-07', 'AD-08', 'AD-09',
                     'AD-20', 'AD-21', 'AD-22', 'AD-23', 'AD-24', 'AD-25', 'AD-26',
-                    'AD-27', 'AD-28', 'AD-29', 'AD-30', 'AD-31', 'AD-32', 'AD-33')
+                    'AD-27', 'AD-28', 'AD-29', 'AD-30', 'AD-31', 'AD-32')
     }
     'GraphPowerShell' = @{
         Module = 'Microsoft.Graph'

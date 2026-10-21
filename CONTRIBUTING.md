@@ -51,7 +51,7 @@ Everything you commit is visible to everyone, and git history is permanent: a se
    ```
    Leave out `-Admin` if the tool works without Administrator rights.
 
-3. **Choose an unused ID** in the form `PREFIX-NN`: letters or digits, a hyphen, then a number, such as `NET-32` or `HW-15`. Use the prefix the category already uses. Never reuse the ID of a retired tool, because it is an alias for the tool that replaced it (see `docs/ARCHITECTURE.md`, "Retiring a tool"). The registration test rejects duplicates.
+3. **Choose an unused ID** in the form `PREFIX-NN`: letters or digits, a hyphen, then a number, such as `NET-32` or `HW-15`. Use the prefix the category already uses. Never reuse the ID of a retired tool: a merged tool's ID is an alias for the tool that replaced it (see `docs/ARCHITECTURE.md`, "Retiring a tool"), and a removed one (SET-01, AD-33) would make old notes and saved favourites point at a different tool. The registration test rejects duplicates.
 
 4. **Output and prompts** - use the toolkit helpers so the tool works in both the GUI and the console:
    - `Write-Ok`, `Write-Info`, `Write-Warn`, `Write-Err`, `Write-Section`, `Write-Check`
@@ -91,7 +91,7 @@ Everything you commit is visible to everyone, and git history is permanent: a se
 
 4. **Standard user and Administrator** - if the tool reads system state, try it both elevated and not, and make sure neither gives a wrong answer.
 
-The same checks run in CI on every pull request that changes a `.ps1` file or `README.md`: syntax, file encoding, the registration test, and PSScriptAnalyzer.
+The same checks run in CI on every pull request: syntax, file encoding, the registration test, and PSScriptAnalyzer. They must pass before the pull request can merge.
 
 ## Making Changes
 
