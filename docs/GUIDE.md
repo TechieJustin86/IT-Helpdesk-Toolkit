@@ -41,17 +41,17 @@ None of these files are part of the repository; `.gitignore` excludes them.
 
 ## Configuration
 
-Defaults live in `Toolkit\Core\Config.ps1`, and **TKA-01** shows them. Only one setting changes the toolkit's behaviour today:
+`Toolkit\Core\Config.ps1` holds the toolkit's one setting, and **TKA-01** shows it:
 
 ```powershell
 $Script:Config.Logging.MaxErrorsToKeep = 200   # entries kept in toolkit-errors.json
 ```
 
-The other sections in `Config.ps1` (timeouts, retries, resources, performance, security) are not read by any tool. They remain only so older settings files still load. **SET-01** writes its own `toolkit-settings.json`, which nothing reads either.
+There is no settings file; to change the value, edit it in `Config.ps1`. A `Toolkit\Settings\toolkit-settings.json` left by an older version (written by the removed SET-01) was never read and can be deleted.
 
 ## Helpers for tool authors
 
-The everyday ones live in `Core\Common.ps1` and `Core\Validation.ps1`:
+The everyday ones live in `Core\Common.ps1`:
 
 ```powershell
 Write-Ok / Write-Info / Write-Warn / Write-Err 'text'     # coloured output, works in GUI and console

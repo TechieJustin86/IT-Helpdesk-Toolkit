@@ -32,7 +32,7 @@ gh pr merge <number> --squash --admin --delete-branch
 ## When to Ask Claude for Help
 
 ### ✅ Tell Claude To:
-- 🐛 **Fix bugs** - "SET-01 gives an error when..."
+- 🐛 **Fix bugs** - "TRB-07 gives an error when..."
 - ✨ **Add features** - "Add a new tool to the Network category..."
 - 📝 **Update docs** - "Update README to mention..."
 - 🔍 **Code review** - "Review this before I push"
@@ -61,7 +61,7 @@ cd <your clone of IT-Helpdesk-Toolkit>
 
 # For fixes:
 git checkout -b fix/brief-description
-# Example: git checkout -b fix/set-01-file-open-error
+# Example: git checkout -b fix/trb-07-restart-error
 
 # For new features:
 git checkout -b feature/brief-description
@@ -96,14 +96,14 @@ If the tool reads system state, try it both elevated and as a standard user.
 git add .
 
 # Commit with clear message
-git commit -m "fix: SET-01 now opens settings file correctly
+git commit -m "fix: TRB-07 reports a failed restart as failed
 
 Detailed explanation here if needed.
 Explain what changed and why."
 ```
 
 **Good commit messages:**
-- ✅ `fix: SET-01 opens settings with Invoke-Item instead of &`
+- ✅ `fix: TRB-07 reports a failed restart instead of success`
 - ✅ `feat: add NET-32 subnet scanner tool`
 - ✅ `docs: update README with new feature explanation`
 
@@ -137,7 +137,7 @@ gh pr checks <number>                                   # wait for "Validate Pow
 gh pr merge <number> --squash --admin --delete-branch
 ```
 
-The checks are not a required status on `master`, so the override merges even while they are still running or failing. Wait for them first.
+"Validate PowerShell" is a required check enforced by a repository ruleset with no bypass, so even `--admin` cannot merge until it passes. If the merge is refused, wait for the check to finish.
 
 ### Step 7: Clean Up Locally
 
@@ -160,30 +160,30 @@ git branch -d feature/your-branch-name
 
 ```powershell
 # 1. Identify the problem
-# "SET-01 gives error when opening settings"
+# "TRB-07 says the service restarted when it did not"
 
 # 2. Create fix branch
-git checkout -b fix/set-01-settings-error
+git checkout -b fix/trb-07-restart-status
 
 # 3. Find and edit the file
-# Open Toolkit\Modules\22-Settings.ps1
+# Open Toolkit\Modules\10-Troubleshooting.ps1
 
 # 4. Fix the issue
 
 # 5. Test it
 .\Tests\Test-ToolRegistration.ps1
 .\Toolkit\Launch-GUI.bat
-# Navigate to SET-01, test the fix
+# Navigate to TRB-07, test the fix
 
 # 6. Commit
 git add .
-git commit -m "fix: SET-01 opens settings file with Invoke-Item
+git commit -m "fix: TRB-07 reports a failed restart as failed
 
-Changed from & operator (execute) to Invoke-Item (open in editor).
-Added Path validation to prevent empty string error."
+Restart-Service errors were hidden by SilentlyContinue, so the tool
+always printed success. It now uses -ErrorAction Stop and reports the error."
 
 # 7. Push, open the PR, and merge once the check passes
-git push -u origin fix/set-01-settings-error
+git push -u origin fix/trb-07-restart-status
 ```
 
 ### Adding a New Tool
@@ -237,13 +237,13 @@ IT-Helpdesk-Toolkit\
 
 ✅ **Branch protection** - `master` needs a PR with one approving review; the admin override bypasses it
 ✅ **CODEOWNERS** - you own every path
-✅ **PowerShell checks** - syntax, file encoding, the registration test and PSScriptAnalyzer run on PRs that change a `.ps1` file or `README.md`
+✅ **PowerShell checks** - syntax, file encoding, the registration test and PSScriptAnalyzer run on every PR, and must pass before it merges
 ✅ **Secret scanning and push protection** - GitHub blocks pushes containing known secret formats
 ℹ️ **Dependabot** - security updates are enabled, but the repo has no package manifests, so there is nothing for it to scan
 
 **What this means for you:**
 - All changes go through a PR (even yours)
-- Scripts are checked automatically, but the check is not required, so wait for it before merging
+- Scripts are checked automatically, and a PR cannot merge until the check passes
 - Known secret formats are caught by GitHub; everything else relies on checking before you commit
 
 ---
@@ -262,7 +262,7 @@ git push -u origin fix/your-issue
 Open the failed step in GitHub Actions. It will be one of:
 - **Validate PowerShell Syntax** - a script doesn't parse
 - **Check file encoding** - a script has non-ASCII characters but no BOM; save it as UTF-8 with BOM
-- **Tool registration** - a module failed to load, a tool ID is duplicated or malformed, or the README counts don't match
+- **Tool registration** - a module failed to load, a tool ID is duplicated or malformed, a dependency list is out of date, or the README counts don't match
 - **PSScriptAnalyzer** - an Error-severity finding
 
 Fix it and push to the same branch; the PR updates automatically.
@@ -283,7 +283,7 @@ git checkout feature/other-name  # Switch to another branch
 
 ## Version Info
 
-- **Last Updated:** 2026-10-19
+- **Last Updated:** 2026-10-21
 - **Toolkit Version:** 1.5.0 (plus the changes under "Unreleased" in docs\CHANGELOG.md)
 - **Repository:** https://github.com/TechieJustin86/IT-Helpdesk-Toolkit
 
