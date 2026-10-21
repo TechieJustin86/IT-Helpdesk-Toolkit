@@ -631,17 +631,3 @@ Add-Tool -Id 'AD-32' -Category 'Active Directory' -Name 'User profile management
     }
 }
 
-Add-Tool -Id 'AD-33' -Category 'Active Directory' -Name 'AD Self-Service Plus registry config' -Description 'Configure AD Self-Service Plus registry settings' -Admin -Action {
-    Write-Info 'Configuring AD Self-Service Plus registry settings...'
-    $regPath = 'HKLM:\Software\Policies\Quest Software\ActiveRoles\SelfService'
-
-    try {
-        if (-not (Test-Path $regPath)) {
-            Write-Info 'Registry path does not exist. Creating...'
-            New-Item -Path $regPath -Force -ErrorAction Stop | Out-Null
-        }
-        Set-ItemProperty -Path $regPath -Name 'Enabled' -Value 1 -ErrorAction Stop
-        Write-Ok 'AD Self-Service Plus registry settings configured.'
-        Write-Log 'AD Self-Service Plus registry settings modified'
-    } catch { Write-Err "Configuration failed: $($_.Exception.Message)" }
-}

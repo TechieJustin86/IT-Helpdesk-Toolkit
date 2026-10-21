@@ -1,6 +1,6 @@
 # IT Helpdesk Toolkit v1.5
 
-An all-in-one PowerShell toolbox for Windows support with **292 tools in 23 categories**. Core tools need nothing installed; the optional Active Directory and Microsoft 365 tools install their modules on request. Runs on Windows PowerShell 5.1 and PowerShell 7.
+An all-in-one PowerShell toolbox for Windows support with **290 tools in 23 categories**. Core tools need nothing installed; the optional Active Directory and Microsoft 365 tools install their modules on request. Runs on Windows PowerShell 5.1 and PowerShell 7.
 
 See [docs/GUIDE.md](docs/GUIDE.md) for everyday tasks, logs and troubleshooting, [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how it's built, and [docs/CHANGELOG.md](docs/CHANGELOG.md) for what's changed.
 
@@ -68,7 +68,7 @@ Toolkit\                           everything needed to run it - copy this folde
   HelpdeskToolkit-GUI.ps1          GUI (WPF window)
   HelpdeskToolkit.ps1              console version; also supports -List / -Run <ID>
   Build-SingleFile.ps1             builds standalone single-file copies into dist\
-  Core\                            shared helpers, config, dependency checks, validation, audit log, console menu
+  Core\                            shared helpers, config, dependency checks, audit log, console menu
   Gui\GuiHost.ps1                  sends the tools' prompts and output to the GUI window
   Modules\                         one file per menu category (01-SystemInfo ... 24-Toolkit-Admin)
   Settings\                        GUI preferences (created on first run; travels with the folder)
@@ -140,7 +140,7 @@ There is no launcher, and double-clicking a `.ps1` in Explorer opens it in Notep
 | **Apps & Office** (13) | Installed software · Update all apps (winget) · Uninstall an application · Microsoft 365 / Office repair · Clear Microsoft Teams cache · Clear browser caches · Reset Microsoft Store cache · Outlook troubleshooting · Reset OneDrive · Credential Manager cleanup · Install common apps (winget) · Re-register built-in apps · Recently installed / removed apps |
 | **Security** (20) | Security health check · Defender status and threats · Defender update + quick scan* · Firewall status · Local administrators · Failed logon attempts* · Startup programs · Non-Microsoft scheduled tasks · USB storage history · Installed certificates expiring · Browser extensions · Remote access software check · Defender exclusions* · Suspend / resume BitLocker* · Password and lockout policy · Defender and hardening details · Startup program manager · BitLocker status* · TPM status · Product key retrieval |
 | **Users & Accounts** (12) | Local user accounts · Logged-on sessions · User profile sizes · Manage a local user* · Create local user* · Active Directory user lookup · Group Policy update · Group Policy results report · Azure AD / Entra join status · Local groups and members · Logon history* · Delete local user* |
-| **Active Directory** (23) | RSAT / AD module status · Install RSAT AD tools* · Domain and DC info · Search AD users · AD user group memberships · Search AD computers · Unlock AD user · Enable / disable AD user · Reset AD user password · Find unlinked GPOs · Find disabled GPOs · Search GPOs for text · Find empty groups · Get detailed user info · Check user last logon · User password age report · Export user details and groups · Security groups members report · User security group report · All staff member details · Staff member details (single) · User profile management · AD Self-Service Plus registry config* |
+| **Active Directory** (22) | RSAT / AD module status · Install RSAT AD tools* · Domain and DC info · Search AD users · AD user group memberships · Search AD computers · Unlock AD user · Enable / disable AD user · Reset AD user password · Find unlinked GPOs · Find disabled GPOs · Search GPOs for text · Find empty groups · Get detailed user info · Check user last logon · User password age report · Export user details and groups · Security groups members report · User security group report · All staff member details · Staff member details (single) · User profile management |
 | **Microsoft 365** (15) | Graph module status · Install Graph modules · Connect to Microsoft 365 · Current Graph connection · Disconnect Microsoft 365 · Tenant information · Search Microsoft 365 users · Microsoft 365 user details · Microsoft 365 user licences · Microsoft 365 user groups · Licensed users · Unlicensed users · Licence summary · Search Microsoft 365 groups · List Microsoft 365 groups |
 | **Troubleshooting** (22) | Recent errors (event log) · Crash / BSOD history · Shutdown / restart history · Performance snapshot · Kill a process · Stopped automatic services · Restart a service* · Find large files / folders · Disk health (SMART) · Reliability history · Printer tools · Windows troubleshooters · Energy / sleep diagnostics · Windows Update history · Memory (RAM) test · Sleep study (battery drain)* · Hardware errors (WHEA) · Smart diagnosis · Windows Update health · Core services status · BSOD analysis (detailed) · Event log analysis |
 | **Remote Computers** (12) | Remote connectivity check · Remote PC summary · Who is logged on (remote) · Remote services · Remote processes · Remote installed software · Restart / shut down remote PC · Remote gpupdate · Open remote consoles · Remote recent errors · Copy files to remote computer · Check registry value on remote computer |
@@ -153,11 +153,11 @@ There is no launcher, and double-clicking a `.ps1` in Explorer opens it in Notep
 | **Daily Utilities** (6) | Quick PC health check · Copy system info to clipboard · Open shared drives/resources · Generate device documentation · Remote desktop launcher · Send test email |
 | **Analytics** (3) | Tool usage analytics · Keyboard shortcuts · Reset usage analytics |
 | **Developer & Debugging** (7) | Tool explorer · Tool statistics · Run tool by ID · Search tools by name · Error log viewer · Error statistics · View tool source (manual) |
-| **Settings & Configuration** (4) | Toolkit settings · Recommendations & best practices · About the toolkit · Performance metrics |
+| **Settings & Configuration** (3) | Recommendations & best practices · About the toolkit · Performance metrics |
 | **Recommendations** (4) | Runtime diagnostics · Recommendations for this PC · Performance baseline · Health check summary |
 | **Toolkit Administration** (6) | Toolkit configuration · Toolkit integrity check · Toolkit diagnostics · Clear error log · Security audit report · About this toolkit |
 
-**Total: 292 tools across 23 categories** (run `HelpdeskToolkit.ps1 -List` for the live list)
+**Total: 290 tools across 23 categories** (run `HelpdeskToolkit.ps1 -List` for the live list)
 
 **Active Directory** tools need the RSAT ActiveDirectory module, which AD-02 installs on Pro, Enterprise or Education editions, plus AD permissions for changes such as unlock or password reset. **Microsoft 365** tools need Microsoft's Graph PowerShell modules, which M365-02 installs for the current user, and a sign-in with M365-03; the session is reused until you disconnect or close the toolkit. Until a module is installed, the tools that need it stop with a note saying which tool installs it.
 
