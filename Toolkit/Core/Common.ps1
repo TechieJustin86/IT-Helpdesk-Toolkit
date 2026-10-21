@@ -188,6 +188,23 @@ function Confirm-Action {
     return ($answer -match '^(y|yes)$')
 }
 
+function Confirm-DestructiveAction {
+    # For actions that cannot be undone: names the target and requires "yes" typed in
+    # full, where Confirm-Action accepts a single "y". (Moved here from Validation.ps1,
+    # which held only unused validators besides this. Its -Force switch, which skipped
+    # the question entirely, was dropped too: no caller passed it.)
+    param(
+        [Parameter(Mandatory)][string]$Action,
+        [string]$Target = 'this system'
+    )
+    Write-Host ''
+    Write-Warn "DESTRUCTIVE OPERATION: $Action"
+    Write-Warn "Target: $Target"
+    Write-Host ''
+    $confirm = Read-Host "  Type 'yes' to confirm, anything else to cancel"
+    return ($confirm -eq 'yes')
+}
+
 function Wait-Key { [void](Read-Host '  Press Enter to continue') }
 
 function Get-OutFile {

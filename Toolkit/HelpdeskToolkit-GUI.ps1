@@ -56,7 +56,7 @@ function Get-ToolkitSources {
     $guiDir = Join-Path $Script:Root 'Gui'
 
     # Load Core files in dependency order (not alphabetical)
-    $coreOrder = @('Common.ps1', 'Config.ps1', 'Dependencies.ps1', 'Validation.ps1', 'SecurityManagement.ps1')
+    $coreOrder = @('Common.ps1', 'Config.ps1', 'Dependencies.ps1', 'SecurityManagement.ps1')
     $coreFiles = @()
     foreach ($name in $coreOrder) {
         $path = Join-Path $coreDir $name

@@ -41,7 +41,7 @@ param(
 
 #region BUILD:SOURCES - Build-SingleFile.ps1 replaces this region with the contents of Core\ and Modules\
 # Load core modules in dependency order
-$coreOrder = @('Common.ps1', 'Config.ps1', 'Dependencies.ps1', 'Validation.ps1', 'SecurityManagement.ps1')
+$coreOrder = @('Common.ps1', 'Config.ps1', 'Dependencies.ps1', 'SecurityManagement.ps1')
 foreach ($file in $coreOrder) {
     $filePath = Join-Path (Join-Path $PSScriptRoot 'Core') $file
     if (Test-Path $filePath) {
