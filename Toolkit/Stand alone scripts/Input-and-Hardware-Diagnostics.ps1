@@ -10,9 +10,17 @@ Privacy and behavior:
 - Does not reconstruct or save typed text.
 - Does not write logs to disk.
 - Captures only key identity, scan code, modifier state, shortcuts, mouse buttons, and wheel activity.
+- Shows the foreground program's name and window title in the "Active app" line, so that
+  the key you press can be read in context. Window titles can contain file names, web
+  addresses and similar, so this is on screen only: it is never saved and never leaves
+  the window. Close the window, or stop capture, if someone is watching the screen.
 - Controller state and Windows hardware information are queried only while their tools are open.
 - Capture stops automatically if the window is minimized or closed.
 - Ctrl+Alt+Delete and other secure-desktop input cannot be captured by normal applications.
+- Input typed into a program running as Administrator is also invisible here, because this
+  tool deliberately runs without elevation (a global hook needs no more rights than that).
+  If keys register nowhere, click this window first, or test against a normal program:
+  an elevated window swallows the input before any unelevated hook sees it.
 #>
 
 try {
@@ -44,6 +52,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -279,7 +288,10 @@ public static class GlobalInputDiagnostics
 
     private static void Enqueue(string value)
     {
-        queue.Enqueue(DateTime.Now.ToString("HH:mm:ss.fff") + "|" + value);
+        // InvariantCulture: the ':' in a custom format is replaced by the current
+        // culture's time separator, so timestamps read as "14.05.03.123" wherever that
+        // separator is not a colon.
+        queue.Enqueue(DateTime.Now.ToString("HH:mm:ss.fff", CultureInfo.InvariantCulture) + "|" + value);
     }
 
     private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
@@ -345,6 +357,7 @@ if (-not ("PointerDiagnostics" -as [type])) {
     Add-Type -ReferencedAssemblies 'System.Windows.Forms' -TypeDefinition @"
 using System;
 using System.Collections.Concurrent;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
@@ -400,7 +413,7 @@ public sealed class PointerDiagnostics : IMessageFilter
 
         queue.Enqueue(String.Format(
             "{0}|{1}|{2}|{3}|{4}|{5}",
-            DateTime.Now.ToString("HH:mm:ss.fff"),
+            DateTime.Now.ToString("HH:mm:ss.fff", CultureInfo.InvariantCulture),
             type == POINTER_INPUT_TYPE.PT_TOUCH ? "TOUCH" : "PEN",
             state,
             pointerId,
@@ -617,6 +630,7 @@ $script:TrackpadMovementEvents = 0
 $script:TrackpadDistance = 0.0
 $script:TrackpadLargeJumps = 0
 $script:TrackpadLastPoint = $null
+$script:TrackpadLastPaint = $null
 $script:TrackpadScrollUp = 0
 $script:TrackpadScrollDown = 0
 $script:TrackpadScrollLeft = 0
@@ -922,6 +936,7 @@ function Reset-TrackpadDiagnostics {
     $script:TrackpadDistance = 0.0
     $script:TrackpadLargeJumps = 0
     $script:TrackpadLastPoint = $null
+    $script:TrackpadLastPaint = $null
     $script:TrackpadScrollUp = 0
     $script:TrackpadScrollDown = 0
     $script:TrackpadScrollLeft = 0
@@ -975,7 +990,15 @@ function Update-TrackpadMovement {
 
     $script:TrackpadLastPoint = $point
     $script:TrackpadMovementEvents++
-    $script:TrackpadCanvas.Invalidate()
+
+    # Repaint at ~30 fps rather than once per movement event: each repaint redraws the
+    # whole path, up to 1800 points. The dialog's own 200 ms timer invalidates as well,
+    # so the final position is always drawn once movement stops.
+    $now = [datetime]::Now
+    if ($null -eq $script:TrackpadLastPaint -or ($now - $script:TrackpadLastPaint).TotalMilliseconds -ge 33) {
+        $script:TrackpadLastPaint = $now
+        $script:TrackpadCanvas.Invalidate()
+    }
 }
 
 function Show-TrackpadDiagnostics {
@@ -1097,6 +1120,9 @@ Scroll right:     $($script:TrackpadScrollRight)
 Tip:
 A smooth continuous path is more useful than the raw event count. Large jumps are observations, not an automatic hardware failure.
 "@
+        # Update-TrackpadMovement repaints at ~30 fps, so this makes sure the last
+        # movement is drawn once the pointer stops.
+        if ($script:TrackpadCanvas) { $script:TrackpadCanvas.Invalidate() }
     })
 
     $reset = New-Object System.Windows.Forms.Button
@@ -1242,9 +1268,22 @@ function Show-TouchscreenDiagnostics {
 
     $timer = New-Object System.Windows.Forms.Timer
     $timer.Interval = 25
+    # Button alignment belongs on Resize, not on a 25 ms timer that reassigned both
+    # positions 40 times a second whether the window had moved or not.
+    $alignHeaderButtons = {
+        $close.Left = $header.ClientSize.Width - 118
+        $reset.Left = $header.ClientSize.Width - 228
+    }
+    # Shown as well as Resize: this dialog opens maximized, so the header is far wider
+    # than the designed button positions before any resize is raised.
+    $d.Add_Shown($alignHeaderButtons)
+    $d.Add_Resize($alignHeaderButtons)
+
     $timer.Add_Tick({
         $rawPointer = $null
-        while([PointerDiagnostics]::TryGetEvent([ref]$rawPointer)) {
+        $pointerCount = 0
+        while($pointerCount -lt 400 -and [PointerDiagnostics]::TryGetEvent([ref]$rawPointer)) {
+            $pointerCount++
             $parts = $rawPointer -split '\|'
             if($parts.Count -lt 6) { continue }
 
@@ -1286,11 +1325,9 @@ function Show-TouchscreenDiagnostics {
         } else { 0 }
 
         $coverageLabel.Text = "Coverage: $($script:TouchTouchedCells.Count)/$totalCells cells ($coverage%)    Touch events: $script:TouchEventCount    Active touches: $($script:TouchActivePointers.Count)    Pen events: $script:PenEventCount"
-        $gridPanel.Invalidate()
-
-        # Keep buttons aligned when maximized/resized.
-        $close.Left = $header.ClientSize.Width - 118
-        $reset.Left = $header.ClientSize.Width - 228
+        # Only when something arrived: this forced a full repaint of the grid 40 times a
+        # second for as long as the window was open, touch input or not.
+        if($pointerCount -gt 0) { $gridPanel.Invalidate() }
     })
 
     $reset.Add_Click({
@@ -1465,7 +1502,9 @@ function Show-ControllerDiagnostics {
         if (-not $connected) {
             $connection.Text = "● Not connected  ($api)"
             $connection.ForeColor = $Colors.Destructive
-            $stateBox.Text = @"
+            # Assigned only when it changes: replacing the whole box 20 times a second
+            # resets the caret and scroll position while it is being read.
+            $notConnected = @"
 No XInput-compatible controller was detected in this slot.
 
 Try:
@@ -1477,6 +1516,7 @@ Try:
 Some older DirectInput-only controllers are visible to Windows but do not
 provide live state through XInput.
 "@
+            if ($stateBox.Text -ne $notConnected) { $stateBox.Text = $notConnected }
             return
         }
 
@@ -1493,7 +1533,7 @@ provide live state through XInput.
         $leftDrift = [Math]::Round([Math]::Sqrt(($leftX * $leftX) + ($leftY * $leftY)))
         $rightDrift = [Math]::Round([Math]::Sqrt(($rightX * $rightX) + ($rightY * $rightY)))
 
-        $stateBox.Text = @"
+        $report = @"
 BUTTONS PRESSED
 $buttons
 
@@ -1520,6 +1560,7 @@ Right: X=$($state.Gamepad.ThumbRX)  Y=$($state.Gamepad.ThumbRY)
 Triggers: L=$($state.Gamepad.LeftTrigger)  R=$($state.Gamepad.RightTrigger)
 Button mask: 0x$('{0:X4}' -f [int]$state.Gamepad.Buttons)
 "@
+        if ($stateBox.Text -ne $report) { $stateBox.Text = $report }
     })
 
     $dialog.Add_Shown({ $timer.Start() })
@@ -2009,10 +2050,13 @@ function Get-ShortcutDescription {
 }
 
 function Get-GhostColor {
-    param([System.Drawing.Color]$Source,[double]$Strength)
-    $r = [int]($Colors.Key.R + (($Source.R - $Colors.Key.R) * $Strength))
-    $g = [int]($Colors.Key.G + (($Source.G - $Colors.Key.G) * $Strength))
-    $b = [int]($Colors.Key.B + (($Source.B - $Colors.Key.B) * $Strength))
+    # Base is where the fade lands. It used to be fixed at $Colors.Key, the plain key
+    # colour, so a modifier, function or navigation key faded to the wrong colour and then
+    # snapped to its own idle colour when Reset-KeyVisual finished the fade.
+    param([System.Drawing.Color]$Source,[double]$Strength,[System.Drawing.Color]$Base = $Colors.Key)
+    $r = [int]($Base.R + (($Source.R - $Base.R) * $Strength))
+    $g = [int]($Base.G + (($Source.G - $Base.G) * $Strength))
+    $b = [int]($Base.B + (($Source.B - $Base.B) * $Strength))
     return [System.Drawing.Color]::FromArgb($r,$g,$b)
 }
 
@@ -2080,11 +2124,16 @@ function Write-Feed {
     param(
         [string]$Category,
         [string]$Message,
-        [string]$Timestamp = $null
+        [string]$Timestamp = $null,
+        # Modifier state for this event, e.g. "CTRL+SHIFT". The grid has always had a
+        # Modifiers column, but nothing ever filled it: $mods below was initialised empty
+        # and never assigned, so every row's Modifiers cell was blank even though the hook
+        # reports the state on every key event.
+        [string]$Modifiers = ''
     )
 
     if (-not $Timestamp) {
-        $Timestamp = Get-Date -Format 'HH:mm:ss.fff'
+        $Timestamp = [datetime]::Now.ToString('HH:mm:ss.fff', [cultureinfo]::InvariantCulture)
     }
 
     if (-not $FeedGrid) {
@@ -2105,7 +2154,7 @@ function Write-Feed {
     $key   = ''
     $scan  = ''
     $vkey  = ''
-    $mods  = ''
+    $mods  = $Modifiers
 
     if ($Category -in 'KEY DOWN','KEY UP') {
         if ($Message -match '^(.+?)\s+VK=(\d+)\s+SCAN=(\d+)') {
@@ -2615,6 +2664,11 @@ function Stop-Capture([string]$Reason='Stopped by user') {
     foreach($vk in @($script:ButtonMap.Keys)){
         Reset-KeyVisual $vk
     }
+
+    # A key held when capture stopped never gets its KEY UP, so clear the flag the key
+    # inspector reads as well; the visuals and hold times are already reset above.
+    foreach($stat in @($script:KeyStats.Values)){ $stat.IsDown = $false }
+    if ($script:SelectedInspectorVk) { Update-KeyInspector $script:SelectedInspectorVk }
 
     $script:KeyDownTimes.Clear()
     $script:FadeQueue.Clear()
@@ -3223,8 +3277,16 @@ $AboutButton.Add_Click({ Show-AboutHelp })
 
 
 $PollTimer.Add_Tick({
+    # Bounded drain. This used to loop until the queue was empty, with no cap: while the
+    # trackpad window is open every mouse movement is queued, and each event costs a
+    # Get-Date, a feed row and several control updates, so a fast swipe could hand this
+    # one tick thousands of events and stall the UI thread. 400 per 25 ms is 16,000
+    # events a second - far above any real input rate - and whatever is left waits for
+    # the next tick instead of blocking this one.
     $raw=$null
-    while([GlobalInputDiagnostics]::TryGetEvent([ref]$raw)){
+    $processed=0
+    while($processed -lt 400 -and [GlobalInputDiagnostics]::TryGetEvent([ref]$raw)){
+        $processed++
         $parts=$raw -split '\|'
         $time=$parts[0];$type=$parts[1]
         if($type -eq 'KD'){
@@ -3275,13 +3337,14 @@ $PollTimer.Add_Tick({
                 $script:ShortcutCounts[$shortcut].Last=Get-Date
                 $script:Stats.Shortcuts++
                 $message=if($description){"$shortcut  [$description]"}else{$shortcut}
-                Write-Feed 'SHORTCUT' $message $time
+                Write-Feed 'SHORTCUT' $message $time -Modifiers $mods
                 Update-ShortcutAnalyzer
             }
-            else{Write-Feed 'KEY DOWN' "$name  VK=$vk  SCAN=$scan  FLAGS=$flags" $time}
+            else{Write-Feed 'KEY DOWN' "$name  VK=$vk  SCAN=$scan  FLAGS=$flags" $time -Modifiers $mods}
             if($vk -in 20,144,145){Update-LockIndicators}
         } elseif($type -eq 'KU'){
             $vk=[int]$parts[2];$scan=[int]$parts[3];$name=Get-KeyName $vk
+            $keyUpMods=if($parts.Count -gt 5){$parts[5]}else{''}
             $heldMs=0
             if($script:KeyDownTimes.ContainsKey($vk)){
                 $heldMs=[Math]::Round(((Get-Date)-$script:KeyDownTimes[$vk]).TotalMilliseconds)
@@ -3301,7 +3364,7 @@ $PollTimer.Add_Tick({
                     $testStat.LongestHoldMs = $heldMs
                 }
             }
-            Write-Feed 'KEY UP' "$name  HELD=${heldMs}ms" $time
+            Write-Feed 'KEY UP' "$name  HELD=${heldMs}ms" $time -Modifiers $keyUpMods
             $script:FadeQueue[$vk]=@{Start=Get-Date;Color=(Get-KeyCategoryColor $vk)}
             if($script:SelectedInspectorVk -eq $vk){Update-KeyInspector $vk}
         } elseif($type -eq 'M'){
@@ -3361,7 +3424,9 @@ $PollTimer.Add_Tick({
             }
         }
     }
-    Update-Stats
+    # Only when something actually happened: this walked every key statistic and the whole
+    # 60-second keypress window 40 times a second even with an empty queue.
+    if($processed -gt 0){ Update-Stats }
 })
 
 $UiTimer.Add_Tick({
@@ -3383,11 +3448,12 @@ $UiTimer.Add_Tick({
             $vk=[int]$key
             $ghost=$script:FadeQueue[$key]
             $age=((Get-Date)-$ghost.Start).TotalMilliseconds
+            $fadeBase=if($script:TestMode){Get-HeatMapColor $vk}else{Get-KeyIdleColor $vk}
             if($age -gt 650){Reset-KeyVisual $vk;$script:FadeQueue.Remove($key)}
-            elseif($age -gt 450){Set-KeyVisual $vk (Get-GhostColor $ghost.Color 0.15)}
-            elseif($age -gt 250){Set-KeyVisual $vk (Get-GhostColor $ghost.Color 0.30)}
-            elseif($age -gt 100){Set-KeyVisual $vk (Get-GhostColor $ghost.Color 0.55)}
-            else{Set-KeyVisual $vk (Get-GhostColor $ghost.Color 0.85)}
+            elseif($age -gt 450){Set-KeyVisual $vk (Get-GhostColor $ghost.Color 0.15 $fadeBase)}
+            elseif($age -gt 250){Set-KeyVisual $vk (Get-GhostColor $ghost.Color 0.30 $fadeBase)}
+            elseif($age -gt 100){Set-KeyVisual $vk (Get-GhostColor $ghost.Color 0.55 $fadeBase)}
+            else{Set-KeyVisual $vk (Get-GhostColor $ghost.Color 0.85 $fadeBase)}
         }
     }
     if ($script:TestMode -and [GlobalInputDiagnostics]::IsRunning) {
@@ -3406,8 +3472,15 @@ $UiTimer.Add_Tick({
     }
 
     if($StuckKeysValue){$stuck=@($script:StuckWarned.Keys).Count;$StuckKeysValue.Text=if($stuck -gt 0){"$stuck  !"}else{'0  ✓'};$StuckKeysValue.ForeColor=if($stuck -gt 0){$Colors.Destructive}else{$Colors.Text}}
-    if($MouseLeftState){$MouseLeftState.Text="$($MouseLeftState.Text -replace '\s+\(\d+\)$','') ($($script:MouseClickCounts.LEFT))"}
-    if($MouseRightState){$MouseRightState.Text="$($MouseRightState.Text -replace '\s+\(\d+\)$','') ($($script:MouseClickCounts.RIGHT))"}
+    # Click counts are a Test Mode metric - Register-MouseDownDiagnostic ignores ordinary
+    # clicks - so outside Test Mode these labels insisted on "(0)" while the feed was
+    # listing the clicks. Show the number only while it is being collected.
+    foreach($statePair in @(@($MouseLeftState,'LEFT'),@($MouseRightState,'RIGHT'))){
+        $stateControl=$statePair[0]
+        if(-not $stateControl){continue}
+        $baseText=$stateControl.Text -replace '\s+\(\d+\)$',''
+        $stateControl.Text=if($script:TestMode){"$baseText ($($script:MouseClickCounts[$statePair[1]]))"}else{$baseText}
+    }
     Update-LockIndicators
     $app=[GlobalInputDiagnostics]::GetForegroundWindowInfo()
     if($app -ne $script:LastAppInfo){$script:LastAppInfo=$app;$ap=$app -split '\|',2;$title=if($ap.Count -gt 1){$ap[1]}else{''};if($title.Length -gt 90){$title=$title.Substring(0,90)+'...'};$AppLabel.Text="Active app:   $($ap[0])"; if($title){$AppLabel.Text += " - $title"}}
