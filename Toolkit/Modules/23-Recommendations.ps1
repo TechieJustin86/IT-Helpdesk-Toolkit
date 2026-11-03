@@ -122,8 +122,11 @@ Add-Tool -Id 'REC-05' -Category 'Recommendations' -Name 'Health check summary' -
     if ($errors) { Write-Check 'WARN' 'Total Errors' $errors.Count }
 
     Write-Section 'Disk Space'
+    # Get-DiskSpace reports LOW / Warning / OK; Write-Check only accepts OK, WARN, FAIL
+    # and INFO, so the raw value used to fail parameter validation and end the report on
+    # any drive below 20% free - exactly the machines this summary is run on.
     Get-DiskSpace | ForEach-Object {
-        $status = $_.Status
+        $status = switch ($_.Status) { 'LOW' { 'FAIL' } 'Warning' { 'WARN' } 'OK' { 'OK' } default { 'INFO' } }
         Write-Check $status "$($_.Drive)" "$($_.Free) free ($($_.'Free %')%)"
     }
 }

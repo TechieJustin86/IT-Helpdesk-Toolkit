@@ -71,18 +71,13 @@ Add-Tool -Id 'DAILY-03' -Category 'Daily Utilities' -Name 'Open shared drives/re
     )
 
     Write-Info 'Common shares (edit Modules\19-DailyTools.ps1 to customize):'
-    for ($i = 0; $i -lt $shares.Count; $i++) {
-        Write-Host "  [$($i+1)] $($shares[$i])" -ForegroundColor Cyan
-    }
-
-    $choice = Read-Host '  Pick one (or leave blank)'
-    if ($choice -and $choice -ge 1 -and $choice -le $shares.Count) {
-        $path = $shares[$choice - 1]
-        Write-Info "Opening $path..."
-        Start-Process explorer $path
-    } else {
-        Write-Info 'Skipped'
-    }
+    # Select-FromList instead of comparing the typed answer by hand: "$choice -le 3" is a
+    # STRING comparison when $choice is text, so "10" passed the range check and indexed
+    # past the end, and a non-numeric answer threw on "$choice - 1".
+    $path = Select-FromList $shares { $_ } 'Share to open'
+    if (-not $path) { Write-Info 'Skipped'; return }
+    Write-Info "Opening $path..."
+    Start-Process explorer.exe -ArgumentList $path
 }
 
 Add-Tool -Id 'DAILY-04' -Category 'Daily Utilities' -Name 'Generate device documentation' -Description 'Create comprehensive device documentation: system info, hardware, network, software list, security status - saved to text file' -Action {
@@ -182,18 +177,11 @@ Add-Tool -Id 'DAILY-05' -Category 'Daily Utilities' -Name 'Remote desktop launch
     )
 
     Write-Info 'Configured servers (edit Modules\19-DailyTools.ps1 to customize):'
-    for ($i = 0; $i -lt $remoteServers.Count; $i++) {
-        Write-Host "  [$($i+1)] $($remoteServers[$i].Name) ($($remoteServers[$i].Host))" -ForegroundColor Cyan
-    }
-
-    $choice = Read-Host '  Pick one (or leave blank)'
-    if ($choice -and $choice -ge 1 -and $choice -le $remoteServers.Count) {
-        $rdpHost = $remoteServers[$choice - 1].Host
-        Write-Info "Connecting to $rdpHost..."
-        mstsc /v:$rdpHost
-    } else {
-        Write-Info 'Skipped'
-    }
+    # Select-FromList instead of comparing the typed answer by hand - see DAILY-03
+    $server = Select-FromList $remoteServers { '{0,-20} {1}' -f $_.Name, $_.Host } 'Server to connect to'
+    if (-not $server) { Write-Info 'Skipped'; return }
+    Write-Info "Connecting to $($server.Host)..."
+    Start-Process mstsc.exe -ArgumentList "/v:$($server.Host)"
 }
 
 Add-Tool -Id 'DAILY-06' -Category 'Daily Utilities' -Name 'Send test email' -Description 'Verify email configuration: test SMTP server connectivity, port access, SSL - diagnoses email setup issues' -Action {

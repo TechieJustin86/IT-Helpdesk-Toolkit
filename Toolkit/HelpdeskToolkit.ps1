@@ -72,6 +72,25 @@ foreach ($file in @(Get-ChildItem -Path (Join-Path $PSScriptRoot 'Modules') -Fil
 # Menu categories in alphabetical order
 $Script:Categories = @($Script:Tools | ForEach-Object Category | Select-Object -Unique | Sort-Object)
 
+# Favorites are stored by the GUI in Settings\gui-settings.json, which travels with the
+# Toolkit folder. Nothing read them here, so the console menu's "[1] Favorites" was
+# permanently empty even when tools were starred. Former IDs are resolved to the tool
+# that replaced them, as the GUI does, and the saved order is kept.
+$Script:Favorites = @()
+try {
+    $settingsFile = Join-Path $Script:ToolkitDir 'Settings\gui-settings.json'
+    if (Test-Path -LiteralPath $settingsFile) {
+        $saved = Get-Content -LiteralPath $settingsFile -Raw -ErrorAction Stop | ConvertFrom-Json
+        $ids = New-Object System.Collections.Generic.List[string]
+        foreach ($raw in @($saved.Favorites)) {
+            if (-not $raw) { continue }
+            $id = Resolve-ToolId "$raw"
+            if (-not $ids.Contains($id)) { $ids.Add($id) }
+        }
+        $Script:Favorites = @($ids)
+    }
+} catch { }
+
 foreach ($e in $Script:ModuleErrors) { Write-Warn "Module skipped - $e" }
 
 #region ---------------------------------------------------------------- Entry point

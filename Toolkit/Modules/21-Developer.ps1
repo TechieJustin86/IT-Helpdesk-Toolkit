@@ -116,23 +116,22 @@ Add-Tool -Id 'DEV-06' -Category 'Developer & Debugging' -Name 'Error log viewer'
         return
     }
 
-    try {
-        $errors = Get-Content -LiteralPath $errorLogPath -Raw | ConvertFrom-Json
-    } catch {
-        Write-Err "Could not read error log: $_"
-        return
-    }
+    # Get-JsonLogEntries, not Get-Content | ConvertFrom-Json: Windows PowerShell 5.1 hands
+    # back a top-level JSON array as ONE object, so the count read 1 however many entries
+    # there were and the loop below got the whole array as a single item - every field
+    # printed as a space-joined list. It also returns @() for an unreadable file.
+    $errors = @(Get-JsonLogEntries -Path $errorLogPath)
 
-    if (-not $errors) {
+    if (-not $errors.Count) {
         Write-Info 'No errors in log'
         return
     }
 
-    Write-Info "Found $(@($errors).Count) error(s) in log:"
+    Write-Info "Found $($errors.Count) error(s) in log:"
     Write-Host ''
 
     # Display recent errors (last 10)
-    @($errors) | Select-Object -Last 10 | ForEach-Object {
+    $errors | Select-Object -Last 10 | ForEach-Object {
         Write-Host "════════════════════════════════════════════════════════════" -ForegroundColor DarkRed
         Write-Check -Status FAIL -Label 'Time' -Value $_.Timestamp
         Write-Check -Status FAIL -Label 'Tool' -Value "$($_.ToolId): $($_.ToolName)"
@@ -168,14 +167,9 @@ Add-Tool -Id 'DEV-07' -Category 'Developer & Debugging' -Name 'Error statistics'
         return
     }
 
-    try {
-        $errors = Get-Content -LiteralPath $errorLogPath -Raw | ConvertFrom-Json
-    } catch {
-        Write-Err "Could not read error log"
-        return
-    }
-
-    $errors = @($errors)
+    # Get-JsonLogEntries for the same reason as DEV-06: the piped ConvertFrom-Json idiom
+    # collapsed the whole log into one object, so every count and grouping was wrong.
+    $errors = @(Get-JsonLogEntries -Path $errorLogPath)
     if ($errors.Count -eq 0) {
         Write-Info 'No errors recorded'
         return

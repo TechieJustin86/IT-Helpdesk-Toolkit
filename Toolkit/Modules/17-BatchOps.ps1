@@ -94,11 +94,16 @@ Add-Tool -Id 'BATCH-03' -Category 'Batch Operations' -Name 'Get software invento
     foreach ($computer in $computerList) {
         Write-Info "  $computer..."
         try {
-            $software = Invoke-Command -ComputerName $computer -ScriptBlock {
-                Get-ItemProperty -Path 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*' |
-                    Select-Object DisplayName, DisplayVersion, Publisher |
-                    Where-Object { $_.DisplayName }
-            } -ErrorAction SilentlyContinue
+            # -ErrorAction Stop, or an unreachable PC fell through to "apps" and a tick:
+            # the catch never ran because the error was silenced.
+            # Both uninstall hives are read; the 32-bit one was missing, so every x86 app
+            # on a 64-bit PC was left out of the audit.
+            $software = Invoke-Command -ComputerName $computer -ErrorAction Stop -ScriptBlock {
+                Get-ItemProperty -Path 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*',
+                                       'HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*' -ErrorAction SilentlyContinue |
+                    Where-Object { $_.DisplayName -and $_.SystemComponent -ne 1 -and -not $_.ParentKeyName } |
+                    Select-Object DisplayName, DisplayVersion, Publisher
+            }
 
             foreach ($app in $software) {
                 $allSoftware += [pscustomobject]@{
@@ -108,9 +113,9 @@ Add-Tool -Id 'BATCH-03' -Category 'Batch Operations' -Name 'Get software invento
                     Publisher = $app.Publisher
                 }
             }
-            Write-Ok "  $computer - $(($software | Measure-Object).Count) apps"
+            Write-Ok "  $computer - $(@($software).Count) apps"
         } catch {
-            Write-Err "  $computer - Failed to connect"
+            Write-Err "  $computer - Failed: $($_.Exception.Message)"
         }
     }
 
@@ -175,15 +180,16 @@ Add-Tool -Id 'BATCH-05' -Category 'Batch Operations' -Name 'Apply Windows update
     Write-Info "Triggering update check on $($computerList.Count) computer(s)..."
     Write-Host ''
 
+    # -ErrorAction Stop, or every PC was reported as "initiated" whether it answered or not
     foreach ($computer in $computerList) {
         try {
             Write-Info "  $computer - Triggering update check..."
-            Invoke-Command -ComputerName $computer -ScriptBlock {
+            Invoke-Command -ComputerName $computer -ErrorAction Stop -ScriptBlock {
                 (New-Object -ComObject Microsoft.Update.AutoUpdate).DetectNow()
-            } -ErrorAction SilentlyContinue
+            }
             Write-Ok "  $computer - Update check initiated"
         } catch {
-            Write-Err "  $computer - Failed"
+            Write-Err "  $computer - Failed: $($_.Exception.Message)"
         }
     }
 }
@@ -205,13 +211,14 @@ Add-Tool -Id 'BATCH-06' -Category 'Batch Operations' -Name 'Run script on multip
     Write-Info "Running script on $($computerList.Count) computer(s)..."
     Write-Host ''
 
+    # -ErrorAction Stop, or every PC was reported as "Completed" whether the script ran or not
     foreach ($computer in $computerList) {
         try {
             Write-Info "  $computer..."
-            Invoke-Command -ComputerName $computer -ScriptBlock ([scriptblock]::Create($scriptContent)) -ErrorAction SilentlyContinue
+            Invoke-Command -ComputerName $computer -ScriptBlock ([scriptblock]::Create($scriptContent)) -ErrorAction Stop | Out-Host
             Write-Ok "  $computer - Completed"
         } catch {
-            Write-Err "  $computer - Failed: $_"
+            Write-Err "  $computer - Failed: $($_.Exception.Message)"
         }
     }
 }

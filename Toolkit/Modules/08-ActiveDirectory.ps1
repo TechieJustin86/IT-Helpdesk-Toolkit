@@ -609,16 +609,31 @@ Add-Tool -Id 'AD-32' -Category 'Active Directory' -Name 'User profile management
 
     switch ($choice) {
         '1' {
+            if (-not (Test-IsAdmin)) { Write-Warn "Deleting another user's profile needs Administrator rights - restart the toolkit as Administrator."; return }
             $username = "$(Read-Host '  Username to delete profile for')".Trim()
             if (-not $username) { return }
-            if (-not (Confirm-DestructiveAction -Action 'Delete the user profile and everything in it' -Target $username)) { return }
-            try {
-                # Win32_UserProfile has no Name property; match the profile folder name (strip DOMAIN\ and WQL wildcards)
-                $folder = ($username -split '\\')[-1] -replace "['%]", ''
-                Get-CimInstance Win32_UserProfile -Filter "LocalPath LIKE '%\\$folder'" -ErrorAction Stop | Remove-CimInstance -ErrorAction Stop
-                Write-Ok "Profile deleted for $username"
-                Write-Log "User profile deleted: $username"
-            } catch { Write-Err "Profile deletion failed: $($_.Exception.Message)" }
+            # Win32_UserProfile has no Name property; match the profile folder name (strip DOMAIN\ and WQL wildcards).
+            $folder = ($username -split '\\')[-1] -replace "['%]", ''
+            if (-not $folder) { Write-Err 'Enter a username.'; return }
+            # Look the profile up BEFORE confirming and deleting. Remove-CimInstance with no
+            # input succeeds silently, so a name that matched nothing - a profile folder that
+            # does not match the username, for instance - still reported "Profile deleted".
+            $profiles = @(Get-CimInstance Win32_UserProfile -Filter "LocalPath LIKE '%\\$folder'" -ErrorAction SilentlyContinue | Where-Object { -not $_.Special })
+            if (-not $profiles.Count) { Write-Err "No local profile folder named '$folder' on this PC. USR-03 lists the profiles that exist."; return }
+            foreach ($p in $profiles) {
+                $owner = try { (New-Object Security.Principal.SecurityIdentifier $p.SID).Translate([Security.Principal.NTAccount]).Value } catch { $p.SID }
+                Write-Warn "$($p.LocalPath)   owner $owner   last used $($p.LastUseTime)   loaded: $($p.Loaded)"
+            }
+            if (@($profiles | Where-Object Loaded).Count) { Write-Err 'That profile is loaded (the user is signed in). Sign them out first.'; return }
+            if (-not (Confirm-DestructiveAction -Action "Delete $($profiles.Count) user profile(s) and everything in them" -Target (@($profiles.LocalPath) -join ', '))) { return }
+            foreach ($p in $profiles) {
+                try {
+                    $p | Remove-CimInstance -ErrorAction Stop
+                    if (Test-Path -LiteralPath $p.LocalPath) { Write-Warn "$($p.LocalPath): the profile was unregistered but some files could not be removed." }
+                    else { Write-Ok "Profile deleted: $($p.LocalPath)" }
+                    Write-Log "User profile deleted: $($p.LocalPath)"
+                } catch { Write-Err "Could not delete $($p.LocalPath): $($_.Exception.Message)" }
+            }
         }
         '2' {
             Write-Info 'To enable roaming profiles, set the profilePath in AD for the user.'
