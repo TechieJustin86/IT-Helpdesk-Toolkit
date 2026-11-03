@@ -7,7 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+- **Favorites were silently capped at six.** Starring a seventh tool was refused with a
+  message about Quick Access being full - the row of buttons at the top, which holds six -
+  even though Favorites is a category of its own with its own search. Starring is now
+  unlimited; Quick Access shows the first six, and the Favorite button, its tooltip and
+  the right-click menu say Favorites rather than Quick Access.
+- **Drag-to-reorder in the Favorites list did nothing.** Nothing ever started a drag
+  operation, so WPF raised no `DragOver` or `Drop` and both handlers were unreachable;
+  the drop position was also read from `ToolList.SelectedIndex`, which is the row that was
+  selected, not the one dropped on. A drag now begins once the pointer passes the system
+  drag threshold, and the tool is inserted where it was dropped.
+- **The output pane grew without limit.** Nothing trimmed it, so a tool printing tens of
+  thousands of lines - a /24 ping sweep, `-List`, a recursive file scan - grew the
+  document until the window crawled. The oldest lines are now dropped past roughly 10,000
+  lines, with a note in the pane saying so.
+- **Cancelling a list picker in the GUI was recorded as a successful run.** The dialog
+  returned `-1` where `Select-FromList` checks for `$null`, so the documented
+  "cancel abandons the tool" path never ran: the tool carried on with no selection and the
+  audit trail logged Success. It now returns `$null` and the run is recorded as Cancelled,
+  as cancelling an input box already was.
 
 ## [1.6.0] - 2026-11-03
 
