@@ -84,6 +84,9 @@ function Read-Host {
 
 function Confirm-Action {
     param([string]$Message)
+    # Closing the confirm dialog with the title-bar X counts as No, not as cancelling the
+    # tool: for a yes/no question "no" is the safe reading, and every caller checks the
+    # result. The $null branch stays for a dialog that could not be shown at all.
     $result = Request-GuiInput -Kind 'confirm' -Prompt $Message
     if ($null -eq $result) { throw (New-Object System.OperationCanceledException 'Cancelled by user.') }
     [bool]$result

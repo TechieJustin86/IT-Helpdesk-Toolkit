@@ -637,6 +637,14 @@ foreach ($k in $colors.Keys) {
     $Script:Brushes[$k] = $b
 }
 
+# The output pane keeps everything until Clear, which is what makes it useful across
+# several tool runs - but nothing trimmed it, so a tool that prints tens of thousands of
+# lines (a /24 ping sweep, -List, a recursive file scan) grew the document until the
+# window crawled. Trim the oldest lines past this many inlines, in one block rather than
+# per line, so the cost is paid rarely. An inline is a coloured run or a line break, so
+# this is roughly 10,000 lines of output.
+$Script:OutputMaxInlines = 20000
+
 function Add-OutputText {
     param([string]$Text, [string]$Color = '', [bool]$NewLine = $true)
     $brush = $Script:Brushes[$Color]
@@ -649,6 +657,23 @@ function Add-OutputText {
             $Script:Para.Inlines.Add($run)
         }
         if ($i -lt $lines.Count - 1 -or $NewLine) { $Script:Para.Inlines.Add((New-Object System.Windows.Documents.LineBreak)) }
+    }
+    if ($Script:Para.Inlines.Count -gt $Script:OutputMaxInlines) {
+        $drop = $Script:Para.Inlines.Count - [int]($Script:OutputMaxInlines * 0.75)
+        for ($d = 0; $d -lt $drop; $d++) {
+            $first = $Script:Para.Inlines.FirstInline
+            if (-not $first) { break }
+            $Script:Para.Inlines.Remove($first)
+        }
+        # Re-added after every trim: the previous copy is always among the lines just
+        # removed, since trimming takes the oldest inlines first
+        $anchor = $Script:Para.Inlines.FirstInline
+        if ($anchor) {
+            $note = New-Object System.Windows.Documents.Run('  [i] Earlier output was trimmed to keep the window responsive - use Save during long runs if you need all of it.')
+            $note.Foreground = $Script:Brushes['Yellow']
+            $Script:Para.Inlines.InsertBefore($anchor, $note)
+            $Script:Para.Inlines.InsertAfter($note, (New-Object System.Windows.Documents.LineBreak))
+        }
     }
 }
 
@@ -735,7 +760,11 @@ function Show-SelectDialog {
     $list.Add_MouseDoubleClick({ if ($this.SelectedIndex -ge 0) { [System.Windows.Window]::GetWindow($this).DialogResult = $true } })
     $d.Add_ContentRendered({ [void]$list.Focus() })
     if ($d.ShowDialog()) { return $list.SelectedIndex }
-    return -1
+    # $null, not -1: GuiHost's Select-FromList treats $null as "the user cancelled" and
+    # raises OperationCanceledException, which the tool runner records as Cancelled, the
+    # same as cancelling an input box. -1 slipped past that check and the tool carried on
+    # with no selection, logged as a successful run.
+    return $null
 }
 
 function Show-ConfirmDialog {
@@ -1013,27 +1042,35 @@ function Update-FavButton {
         $Script:Ui.FavIcon.Text = $Script:StarFilled
         $Script:Ui.FavIcon.Foreground = $Script:Gold
         $Script:Ui.FavLabel.Text = 'Favorited'
-        $Script:Ui.FavButton.ToolTip = 'Remove from favorites and Quick Access (Ctrl+B)'
+        $Script:Ui.FavButton.ToolTip = 'Remove from Favorites (Ctrl+B)'
     } else {
         $Script:Ui.FavIcon.Text = $Script:StarOutline
         $Script:Ui.FavIcon.ClearValue([System.Windows.Controls.TextBlock]::ForegroundProperty)
         $Script:Ui.FavLabel.Text = 'Favorite'
-        $Script:Ui.FavButton.ToolTip = 'Add to favorites and Quick Access (Ctrl+B)'
+        $Script:Ui.FavButton.ToolTip = "Add to Favorites (Ctrl+B) - the first $Script:QuickAccessMax also appear in Quick Access"
     }
 }
 
 function Switch-Favorite {
     param($Tool)
     if (-not $Tool) { return }
+    # Favorites are not capped. Quick Access is the row of buttons at the top, which only
+    # has room for $Script:QuickAccessMax of them, and this used to refuse the whole
+    # favourite once that row was full - so a seventh star was impossible and the message
+    # talked about Quick Access when the user had asked for a favourite. The Favorites
+    # category and its search are the point of starring a tool; Quick Access just shows
+    # the first few.
     if ($Script:Favorites.Contains($Tool.Id)) {
         [void]$Script:Favorites.Remove($Tool.Id)
-        $Script:Ui.StatusText.Text = "Removed $($Tool.Name) from favorites and Quick Access."
-    } elseif (@(Get-FavoriteTools).Count -ge $Script:QuickAccessMax) {
-        $Script:Ui.StatusText.Text = "Quick Access is full ($Script:QuickAccessMax tools). Right-click a Quick Access button and remove one first."
-        return
+        $Script:Ui.StatusText.Text = "Removed $($Tool.Name) from Favorites."
     } else {
         $Script:Favorites.Add($Tool.Id)
-        $Script:Ui.StatusText.Text = "Added $($Tool.Name) to favorites and Quick Access."
+        $position = $Script:Favorites.Count
+        $Script:Ui.StatusText.Text = if ($position -le $Script:QuickAccessMax) {
+            "Added $($Tool.Name) to Favorites and Quick Access."
+        } else {
+            "Added $($Tool.Name) to Favorites (#$position). Quick Access shows the first $Script:QuickAccessMax - drag it higher in the Favorites list to put it there."
+        }
     }
     Save-Settings
     Update-FavMarks
@@ -1080,9 +1117,10 @@ $Script:ToolMenu.Add_Opened({
     $t = $Script:Ui.ToolList.SelectedItem
     $Script:MenuRun.IsEnabled = $Script:Ui.RunButton.IsEnabled
     $isFav = $t -and $Script:Favorites.Contains($t.Id)
-    $full = @(Get-FavoriteTools).Count -ge $Script:QuickAccessMax
-    $Script:MenuFav.IsEnabled = [bool]$t -and ($isFav -or -not $full)
-    $Script:MenuFav.Header = if ($isFav) { 'Remove from Quick Access' } elseif ($full) { "Add to Quick Access (full - $Script:QuickAccessMax max)" } else { 'Add to Quick Access' }
+    # No "full" state any more: starring is unlimited, and the item names Favorites
+    # rather than Quick Access, which is only where the first few of them appear
+    $Script:MenuFav.IsEnabled = [bool]$t
+    $Script:MenuFav.Header = if ($isFav) { 'Remove from Favorites' } else { 'Add to Favorites' }
 })
 $ui.ToolList.ContextMenu = $Script:ToolMenu
 
@@ -1093,7 +1131,7 @@ $Script:QuickMenuRun = New-Object System.Windows.Controls.MenuItem
 $Script:QuickMenuRun.Header = 'Run'
 $Script:QuickMenuRun.Add_Click({ Start-Tool $Script:QuickMenuTool })
 $Script:QuickMenuRemove = New-Object System.Windows.Controls.MenuItem
-$Script:QuickMenuRemove.Header = 'Remove from Quick Access'
+$Script:QuickMenuRemove.Header = 'Remove from Favorites'
 $Script:QuickMenuRemove.Add_Click({ Switch-Favorite $Script:QuickMenuTool })
 [void]$Script:QuickMenu.Items.Add($Script:QuickMenuRun)
 [void]$Script:QuickMenu.Items.Add($Script:QuickMenuRemove)
@@ -1153,43 +1191,77 @@ $ui.ToolList.Add_SelectionChanged({ Show-ToolDetails })
 $ui.ToolList.Add_MouseDoubleClick({ Start-Tool $Script:Ui.ToolList.SelectedItem })
 $ui.ToolList.Add_KeyDown({ if ($_.Key -eq 'Return') { Start-Tool $Script:Ui.ToolList.SelectedItem } })
 
-# Drag-to-reorder favorites
-$Script:DraggedItem = $null
-$Script:DraggedFromIndex = -1
-$ui.ToolList.Add_PreviewMouseLeftButtonDown({
-    $cat = $Script:Ui.CategoryList.SelectedItem
-    if ($cat -and $cat.Kind -eq 'fav') {
-        $Script:DraggedItem = $Script:Ui.ToolList.SelectedItem
-        $Script:DraggedFromIndex = $Script:Ui.ToolList.SelectedIndex
+# Drag-to-reorder favorites.
+# This never worked: nothing started a drag operation, so WPF raised no DragOver or Drop
+# and the handlers below were unreachable. It also read the drop position from
+# ToolList.SelectedIndex, which is the item that was selected, not the one dropped on.
+# Now a drag begins once the pointer passes the system drag threshold, and the drop
+# target is the list item actually under the pointer.
+$Script:DragItem = $null
+$Script:DragStart = $null
+
+# Nearest ListBoxItem at or above a hit-tested element, or $null
+function Get-ListRowAt {
+    param($Source)
+    $node = $Source
+    while ($node -and $node -isnot [System.Windows.Controls.ListBoxItem]) {
+        $node = if ($node -is [System.Windows.Media.Visual]) { [System.Windows.Media.VisualTreeHelper]::GetParent($node) } else { $null }
     }
+    $node
+}
+
+function Test-FavoritesView {
+    $cat = $Script:Ui.CategoryList.SelectedItem
+    [bool]($cat -and $cat.Kind -eq 'fav' -and -not $Script:Ui.SearchBox.Text)
+}
+
+$ui.ToolList.Add_PreviewMouseLeftButtonDown({
+    $Script:DragItem = $null
+    if (-not (Test-FavoritesView)) { return }
+    $row = Get-ListRowAt $_.OriginalSource
+    if (-not $row -or -not $row.DataContext) { return }
+    # Remembered, not started: starting here would swallow the click that selects the row
+    $Script:DragItem = $row.DataContext
+    $Script:DragStart = $_.GetPosition($null)
+})
+$ui.ToolList.Add_PreviewMouseLeftButtonUp({ $Script:DragItem = $null })
+$ui.ToolList.Add_PreviewMouseMove({
+    if (-not $Script:DragItem -or "$($_.LeftButton)" -ne 'Pressed') { return }
+    $now = $_.GetPosition($null)
+    if ([math]::Abs($now.X - $Script:DragStart.X) -lt [System.Windows.SystemParameters]::MinimumHorizontalDragDistance -and
+        [math]::Abs($now.Y - $Script:DragStart.Y) -lt [System.Windows.SystemParameters]::MinimumVerticalDragDistance) { return }
+    $item = $Script:DragItem
+    try { [void][System.Windows.DragDrop]::DoDragDrop($Script:Ui.ToolList, $item, [System.Windows.DragDropEffects]::Move) } catch { }
 })
 $ui.ToolList.Add_DragOver({
-    $cat = $Script:Ui.CategoryList.SelectedItem
-    if ($cat -and $cat.Kind -eq 'fav') {
-        $_.Effects = 'Move'
-        $_.Handled = $true
-    } else {
-        $_.Effects = 'None'
-    }
+    $_.Effects = if ((Test-FavoritesView) -and $Script:DragItem) { 'Move' } else { 'None' }
+    $_.Handled = $true
 })
 $ui.ToolList.Add_Drop({
-    $cat = $Script:Ui.CategoryList.SelectedItem
-    if ($Script:DraggedItem -and $cat -and $cat.Kind -eq 'fav') {
-        $dropIndex = $Script:Ui.ToolList.SelectedIndex
-        if ($dropIndex -ge 0 -and $dropIndex -ne $Script:DraggedFromIndex) {
-            $dragId = $Script:DraggedItem.Id
-            if ($Script:Favorites.Contains($dragId)) {
-                $Script:Favorites.Remove($dragId)
-                $Script:Favorites.Insert($dropIndex, $dragId)
-                Save-Settings
-                Update-CategoryList
-                Update-ToolList
-            }
-        }
-    }
-    $Script:DraggedItem = $null
-    $Script:DraggedFromIndex = -1
+    $dragged = $Script:DragItem
+    $Script:DragItem = $null
     $_.Handled = $true
+    if (-not $dragged -or -not (Test-FavoritesView)) { return }
+    $dragId = "$($dragged.Id)"
+    if (-not $Script:Favorites.Contains($dragId)) { return }
+
+    # Where it was dropped: the row under the pointer, or the end of the list when
+    # dropped past the last row
+    $row = Get-ListRowAt $_.OriginalSource
+    $target = if ($row) { $Script:Ui.ToolList.ItemContainerGenerator.IndexFromContainer($row) } else { -1 }
+    if ($target -lt 0) { $target = $Script:Favorites.Count - 1 }
+    $from = $Script:Favorites.IndexOf($dragId)
+    if ($target -eq $from) { return }
+
+    [void]$Script:Favorites.Remove($dragId)
+    if ($target -gt $Script:Favorites.Count) { $target = $Script:Favorites.Count }
+    $Script:Favorites.Insert($target, $dragId)
+    Save-Settings
+    Update-FavMarks
+    Update-CategoryList
+    Update-ToolList
+    $Script:Ui.ToolList.SelectedItem = @($Script:Ui.ToolList.ItemsSource | Where-Object Id -eq $dragId) | Select-Object -First 1
+    $Script:Ui.StatusText.Text = "Moved $($dragged.Name) to position $($target + 1) in Favorites."
 })
 $ui.SearchBox.Add_KeyDown({
     if ($_.Key -eq 'Down' -and $Script:Ui.ToolList.Items.Count) { $Script:Ui.ToolList.SelectedIndex = 0; [void]$Script:Ui.ToolList.Focus() }

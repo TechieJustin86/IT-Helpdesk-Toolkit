@@ -20,12 +20,12 @@ Get-ChildItem -Recurse | Unblock-File
 
 The window has three columns: categories, tools (with a search box) and the selected tool with its output.
 
-- **Favorites:** star the tools you use most. Click the ☆ **Favorite** button next to **Run**, right-click a tool, or press `Ctrl+B`. Starred tools show a gold ★ in every list and appear under **Favorites** at the top of the categories, in the order you added them. The GUI opens on Favorites when you have some, and on All tools otherwise.
+- **Favorites:** star the tools you use most. Click the ☆ **Favorite** button next to **Run**, right-click a tool, or press `Ctrl+B`. Starred tools show a gold ★ in every list and appear under **Favorites** at the top of the categories, in the order you added them. There is no limit on how many you star. Drag a tool up or down inside the Favorites list to reorder it, and the first six appear as **Quick Access** buttons above the categories. The GUI opens on Favorites when you have some, and on All tools otherwise.
 - **Search:** the search box filters the selected category, including Favorites. Pick **All tools** to search everything. If nothing matches in the current category, the list header says how many matches exist elsewhere. Searching by a tool's former ID finds the tool that replaced it.
 - **Run a tool:** double-click it, or press `Enter`, `F5` or **Run**.
 - **Background runs:** tools run in the background, so the window never freezes. Long jobs like SFC or DISM show their progress in the status bar and can be cancelled with **Stop**.
 - **Questions:** when a tool asks something, you get a dialog box: yes/no, text input, password (masked) or a list picker.
-- **Output:** output keeps its colours and stays until you click **Clear**. You can also copy or save it.
+- **Output:** output keeps its colours and stays until you click **Clear**. You can also copy or save it. Very long runs are trimmed from the top - roughly the last 10,000 lines are kept, so the window stays responsive - so use **Save** during a run whose whole output you need.
 - **Admin tools** are marked `admin` and greyed out until you click **Restart as Administrator**.
 - **Dark mode:** use the toggle in the top-right corner, or press `Ctrl+D`. The first launch follows your Windows light/dark setting; after that your choice is saved with your favorites.
 - **Console version** (bottom right) opens the text-menu version of the same toolkit.
