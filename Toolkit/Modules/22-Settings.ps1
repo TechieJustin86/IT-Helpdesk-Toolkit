@@ -66,7 +66,7 @@ Add-Tool -Id 'SET-03' -Category 'Settings & Configuration' -Name 'About the tool
 
     Write-Host ''
     Write-Host "Version: $Script:Version" -ForegroundColor Cyan
-    Write-Host '  Changes since this version are listed under "Unreleased" in docs\CHANGELOG.md'
+    Write-Host '  What changed in this version, and anything since, is in docs\CHANGELOG.md'
     Write-Host ''
 
     Write-Host 'What is this?'

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [1.6.0] - 2026-11-03
+
 ### Changed
 - **Merged 9 duplicate tools into the tool they duplicated (301 -> 292 tools).** Each
   retired ID still works as an alias, so `-Run`, Run by ID, saved favourites and recents,
@@ -213,9 +217,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > **Correction (2026-10-19):** several items below never took effect. The Cache,
 > ResourceManagement and ErrorHandling modules were added, but nothing called them, so
 > the caching and parallel-job speedups, retries and resource limits did not happen; the
-> modules have since been removed (see Unreleased). The credential caching and log
+> modules have since been removed (see 1.6.0). The credential caching and log
 > masking in SecurityManagement were never called by any tool and have since been
-> removed, and the audit trail recorded nothing until it was connected under Unreleased.
+> removed, and the audit trail recorded nothing until it was connected in 1.6.0.
 
 ### Added
 - **Core Modules (8 new)**:
@@ -317,7 +321,7 @@ We follow Semantic Versioning:
 
 ## How to Upgrade
 
-### To the current version (Unreleased)
+### From 1.5.x to 1.6.0
 1. Copy the new `Toolkit` folder over the old one. Your `Toolkit\Settings\` and
    `Toolkit\Logs\` are kept, because the new copy contains neither.
 2. `Launch-GUI.bat` now lives inside `Toolkit\`. Delete the old copy at the top of the

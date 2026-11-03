@@ -22,7 +22,7 @@
     Do not run directly.
 #>
 
-$Script:Version      = '1.5.0'
+$Script:Version      = '1.6.0'
 # Determine Toolkit directory - Core is one level up from this script
 if ($PSScriptRoot) {
     # From source this file sits in Core\; in a built single file it sits next to the script
