@@ -1,4 +1,4 @@
-# IT Helpdesk Toolkit v1.5
+# IT Helpdesk Toolkit v1.6
 
 An all-in-one PowerShell toolbox for Windows support with **290 tools in 23 categories**. Core tools need nothing installed; the optional Active Directory and Microsoft 365 tools install their modules on request. Runs on Windows PowerShell 5.1 and PowerShell 7.
 
