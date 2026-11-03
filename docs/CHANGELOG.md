@@ -59,6 +59,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 **Tools that gave wrong answers**
+- **REC-05 "Health check summary" ended with an error on any drive below 20% free.** It
+  passed `Get-DiskSpace`'s `LOW` / `Warning` status straight to `Write-Check`, which only
+  accepts `OK`, `WARN`, `FAIL` and `INFO`, so the Disk Space section failed parameter
+  validation on exactly the PCs the summary is run on. The status is now mapped.
+- **MNT-29 "System restore point" could never create one.** `-RestorePointType 'Manual'`
+  is not an accepted value, so every run failed on parameter validation. It uses
+  `MODIFY_SETTINGS`, as MNT-12 does, and explains the one-per-day limit on failure.
+- **MNT-34 "Fix Outlook password prompt" never changed anything.** It called
+  `Get-ChildItem` on `...\Outlook\Security`, which lists that key's subkeys - normally
+  none - so it always reported "Could not locate Outlook registry settings". It now
+  enumerates the installed Office version keys, creates the Security key when missing,
+  and says what it set for each version and scope.
+- **DEV-06 "Error log viewer" and DEV-07 "Error statistics" misread the whole log.** Both
+  used `Get-Content | ConvertFrom-Json`, which hands back a top-level JSON array as one
+  object on Windows PowerShell 5.1: the count always read 1 and each field printed as a
+  space-joined list of every entry's value. They use `Get-JsonLogEntries` like the rest.
+- **TRB-21 "BSOD analysis" never extracted a bugcheck code.** It searched the event
+  message for the literal string "BSOD", which does not appear in it. It now reads the
+  stop code, its parameters and the dump path, and names the common stop codes.
+- **SEC-20 "Product key retrieval" reported no keys.** It printed the Product ID, which is
+  not a key, and then listed the subkey names under `Office\16.0` ("Common", "Word", ...)
+  labelled as Office versions. It now reports the licence status and channel, the last
+  five characters of the installed key, the full OEM key when the firmware holds one, and
+  Office licences from Windows licensing - and says what is not recoverable.
+- **HW-14 "RAM slot utilization" showed a blank slot total and "Type 0" for every module.**
+  `$totalSlots` was assigned inside a `ForEach-Object` block, so it was empty outside it,
+  and the DDR generation was read from `MemoryType`, which Windows reports as 0 on
+  virtually every modern PC; `SMBIOSMemoryType` holds the real value.
+- **BATCH-03, BATCH-05 and BATCH-06 reported success for computers they never reached.**
+  `Invoke-Command -ErrorAction SilentlyContinue` meant the `catch` never ran, so every
+  target got a tick. They stop on error and report the reason per computer. BATCH-03 also
+  only read the 64-bit uninstall hive, leaving every 32-bit app out of the audit.
+- **AD-32 "User profile management" reported "Profile deleted" when it deleted nothing.**
+  `Remove-CimInstance` with no input succeeds silently, so a username that did not match
+  a profile folder still reported success. It now finds the profile first, shows the path,
+  owner and last-use time, refuses a profile that is loaded, requires Administrator, and
+  verifies the folder is gone afterwards.
+- **DAILY-03 and DAILY-05 accepted out-of-range menu answers.** `$choice -le $count`
+  compares as text when the answer is text, so "10" passed a 1-3 check and indexed past
+  the end, and a non-numeric answer threw on `$choice - 1`. Both use `Select-FromList`,
+  which validates - the same fix the DAILY-07 merge made.
+- **The console menu's Favorites list was always empty.** `$Script:Favorites` was only
+  ever populated by the GUI, so "[1] Favorites" read `(0 tools)` however many tools were
+  starred. The console now reads `Settings\gui-settings.json`, resolves former IDs, and
+  keeps the saved order.
+- **MNT-26, TRB-22 and RPT-09 threw on non-numeric input** where other tools validate
+  first. MNT-26 also held an array in `PackageName` when a prefix matched several
+  packages, which `Get-AppxPackage -Name` flattened into one string that matched nothing,
+  and it had no `Import-Module Appx -UseWindowsPowerShell` shim, so it failed outright on
+  PowerShell 7.
 - **INTUNE-01, INTUNE-04 and INTUNE-05 reported "not enrolled" on enrolled devices.**
   They queried WMI's `root\cimv2\mdm\dmmap`, which answers only the SYSTEM account, and
   hid the "Access denied". They now read Windows' enrollment records, which any account

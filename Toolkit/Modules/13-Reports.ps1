@@ -289,9 +289,12 @@ Add-Tool -Id 'RPT-09' -Category 'Reports' -Name 'Event log health report' -Descr
     Write-Section 'Event Log Report Generation'
     Write-Info 'Analyzing recent events...'
 
+    # Validate before casting: [int] on anything non-numeric threw an unhandled error
     $hours = Read-Host "Hours to analyze (default: 24)"
-    if (-not $hours) { $hours = 24 }
-
+    if ($hours -notmatch '^\d+$' -or [int]$hours -lt 1) {
+        if ($hours) { Write-Warn "'$hours' is not a number of hours - using 24." }
+        $hours = 24
+    }
     $startTime = (Get-Date).AddHours(-[int]$hours)
     $allEvents = @()
 

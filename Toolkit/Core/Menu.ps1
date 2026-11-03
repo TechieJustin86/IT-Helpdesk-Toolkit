@@ -105,7 +105,8 @@ function Show-Tools {
 function Show-MainMenu {
     while ($true) {
         Show-Banner
-        $fav = @($Script:Tools | Where-Object { $_.Id -in @($Script:Favorites) })
+        # In the saved order, as the GUI shows them; IDs of tools that no longer exist are skipped
+        $fav = @(foreach ($id in @($Script:Favorites)) { $Script:Tools | Where-Object Id -eq $id | Select-Object -First 1 })
         Write-Host ('   [1] Favorites{0}({1} tools)' -f (' ' * 20), $fav.Count)
         Write-Host ('   [2] All tools{0}({1} tools)' -f (' ' * 20), $Script:Tools.Count)
         Write-Host ''

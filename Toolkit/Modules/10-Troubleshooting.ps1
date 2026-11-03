@@ -398,16 +398,44 @@ Add-Tool -Id 'TRB-21' -Category 'Troubleshooting' -Name 'BSOD analysis (detailed
     }
 
     Write-Section 'Event Log Analysis'
-    $bsodEvents = @(Get-WinEvent -FilterHashtable @{ LogName = 'System'; Id = 1001; ProviderName = 'BugCheck' } -MaxEvents 5 -ErrorAction SilentlyContinue)
+    # The bugcheck event is written by the WER-SystemErrorReporting provider, which the
+    # classic log also shows as source "BugCheck"; accept either.
+    $bsodEvents = @(Get-WinEvent -FilterHashtable @{ LogName = 'System'; Id = 1001 } -MaxEvents 200 -ErrorAction SilentlyContinue |
+        Where-Object { $_.ProviderName -like '*WER-SystemErrorReporting*' -or $_.ProviderName -eq 'BugCheck' } | Select-Object -First 5)
+
+    # Plain-English name for the common stop codes. The old code searched the message for
+    # the literal string "BSOD", which never appears in it, so no code was ever extracted.
+    $stopCodes = @{
+        '0x0000000a' = 'IRQL_NOT_LESS_OR_EQUAL (driver accessed memory at the wrong IRQL)'
+        '0x0000001a' = 'MEMORY_MANAGEMENT (often faulty RAM)'
+        '0x0000001e' = 'KMODE_EXCEPTION_NOT_HANDLED (driver fault)'
+        '0x00000050' = 'PAGE_FAULT_IN_NONPAGED_AREA (bad RAM or driver)'
+        '0x0000007b' = 'INACCESSIBLE_BOOT_DEVICE (storage driver or controller mode)'
+        '0x0000007e' = 'SYSTEM_THREAD_EXCEPTION_NOT_HANDLED (driver fault)'
+        '0x0000009f' = 'DRIVER_POWER_STATE_FAILURE (driver mishandled sleep/resume)'
+        '0x000000c2' = 'BAD_POOL_CALLER (driver memory misuse)'
+        '0x000000d1' = 'DRIVER_IRQL_NOT_LESS_OR_EQUAL (driver fault)'
+        '0x000000ef' = 'CRITICAL_PROCESS_DIED (a required Windows process ended)'
+        '0x00000124' = 'WHEA_UNCORRECTABLE_ERROR (hardware error - see TRB-17)'
+        '0x00000133' = 'DPC_WATCHDOG_VIOLATION (driver or firmware stall)'
+        '0x00000139' = 'KERNEL_SECURITY_CHECK_FAILURE (corruption, often a driver)'
+    }
 
     if ($bsodEvents.Count -gt 0) {
         Write-Warn "$($bsodEvents.Count) BSOD event(s) recorded:"
-        $bsodEvents | ForEach-Object {
-            $msg = $_.Message
-            if ($msg -match 'BSOD.*?(?=\s|$|\\)') {
-                Write-Host "  - $($matches[0])"
+        foreach ($e in $bsodEvents) {
+            Write-Check 'INFO' 'Timestamp' $e.TimeCreated
+            $msg = "$($e.Message)" -replace '\s+', ' '
+            if ($msg -match '0x[0-9a-fA-F]{8}') {
+                $code = $Matches[0].ToLower()
+                Write-Check 'FAIL' '  Stop code' $code
+                if ($stopCodes.ContainsKey($code)) { Write-Check 'INFO' '  Means' $stopCodes[$code] }
+                if ($msg -match 'bugcheck was:\s*(\S+\s*\([^)]*\))') { Write-Check 'INFO' '  Parameters' $Matches[1] }
+            } else {
+                Write-Check 'INFO' '  Detail' $msg
             }
-            Write-Check 'INFO' 'Timestamp' $_.TimeCreated
+            if ($msg -match 'dump was saved in:\s*([^.]+\.\w+)') { Write-Check 'INFO' '  Dump file' $Matches[1].Trim() }
+            Write-Host ''
         }
     } else {
         Write-Info 'No BSOD events in System log'
@@ -421,9 +449,12 @@ Add-Tool -Id 'TRB-21' -Category 'Troubleshooting' -Name 'BSOD analysis (detailed
 Add-Tool -Id 'TRB-22' -Category 'Troubleshooting' -Name 'Event log analysis' -Description 'Scan Application, System, and Security logs for errors and warnings' -Action {
     Write-Section 'Event Log Summary'
 
+    # Validate before casting: [int] on anything non-numeric threw an unhandled error
     $timeRange = Read-Host "Hours to analyze (default: 24)"
-    if (-not $timeRange) { $timeRange = 24 }
-
+    if ($timeRange -notmatch '^\d+$' -or [int]$timeRange -lt 1) {
+        if ($timeRange) { Write-Warn "'$timeRange' is not a number of hours - using 24." }
+        $timeRange = 24
+    }
     $startTime = (Get-Date).AddHours(-[int]$timeRange)
     $logNames = @('Application', 'System', 'Security')
 

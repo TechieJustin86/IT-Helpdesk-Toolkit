@@ -332,18 +332,23 @@ Add-Tool -Id 'HW-14' -Category 'Hardware & Peripherals' -Name 'RAM slot utilizat
     $arrays = @(Get-CimInstance Win32_PhysicalMemoryArray -ErrorAction SilentlyContinue)
     if (-not $arrays) { Write-Warn 'Unable to query memory array'; return }
 
-    $arrays | ForEach-Object {
-        $totalSlots = $_.MemoryDevices
-        Write-Check 'INFO' 'Total slots' "$totalSlots"
-        Write-Check 'INFO' 'Max capacity' (Format-Bytes ($_.MaxCapacity * 1KB))
+    # Assigned outside the pipeline: set inside a ForEach-Object it stayed $null out here,
+    # so "Slot utilization" printed "2 / " with no total.
+    $totalSlots = ($arrays | Measure-Object -Property MemoryDevices -Sum).Sum
+    foreach ($a in $arrays) {
+        Write-Check 'INFO' 'Total slots' "$($a.MemoryDevices)"
+        Write-Check 'INFO' 'Max capacity' (Format-Bytes ($a.MaxCapacity * 1KB))
     }
 
     $mods = @(Get-CimInstance Win32_PhysicalMemory -ErrorAction SilentlyContinue)
     Write-Section 'Installed Modules'
 
+    # Windows reports MemoryType as 0 ("Unknown") on virtually every modern PC; the real
+    # value is in SMBIOSMemoryType, so every stick used to show as "Type 0".
     $ddrType = @{ 20='DDR'; 21='DDR2'; 22='DDR2 FB-DIMM'; 24='DDR3'; 26='DDR4'; 30='LPDDR4'; 34='DDR5'; 35='LPDDR5' }
     $mods | ForEach-Object {
-        $type = if ($ddrType.ContainsKey($_.MemoryType)) { $ddrType[$_.MemoryType] } else { "Type $($_.MemoryType)" }
+        $code = if ($_.SMBIOSMemoryType) { [int]$_.SMBIOSMemoryType } elseif ($_.MemoryType) { [int]$_.MemoryType } else { 0 }
+        $type = if ($ddrType.ContainsKey($code)) { $ddrType[$code] } elseif ($code) { "Type $code" } else { 'Unknown' }
         [pscustomobject]@{
             Slot      = "$($_.BankLabel)".Trim()
             Type      = $type
@@ -353,7 +358,7 @@ Add-Tool -Id 'HW-14' -Category 'Hardware & Peripherals' -Name 'RAM slot utilizat
         }
     } | Format-Table -AutoSize | Out-Host
 
-    $utilization = "$($mods.Count) / $($totalSlots)"
+    $utilization = if ($totalSlots) { "$($mods.Count) / $totalSlots slot(s) populated" } else { "$($mods.Count) module(s) (slot count not reported)" }
     Write-Check 'INFO' 'Slot utilization' $utilization
 }
 

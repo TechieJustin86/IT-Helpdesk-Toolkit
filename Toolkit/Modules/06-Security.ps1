@@ -412,35 +412,39 @@ Add-Tool -Id 'SEC-20' -Category 'Security' -Name 'Product key retrieval' -Descri
 
     Write-Section 'Product Keys'
 
-    # Windows product key
-    Write-Host 'Windows:'
-    try {
-        $productKey = Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion" -Name 'ProductId' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty ProductId
-        if ($productKey) {
-            Write-Check 'INFO' 'Product ID' $productKey
-        } else {
-            Write-Info 'Product ID not available in registry'
-        }
-    } catch { }
+    # This used to print only the Product ID - which is not a product key - and then
+    # list the SUBKEY NAMES under HKLM\...\Office\16.0 ("Common", "Word", ...) labelled
+    # as Office versions. Windows licensing reports the real values.
+    Write-Section 'Windows'
+    $nt = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' -ErrorAction SilentlyContinue
+    if ($nt.ProductId) { Write-Check 'INFO' 'Product ID' $nt.ProductId }
 
-    # Office product keys
-    Write-Host 'Office Products:'
-    $officeVersions = @(
-        'HKLM:\SOFTWARE\Microsoft\Office\16.0',
-        'HKLM:\SOFTWARE\Microsoft\Office\15.0',
-        'HKLM:\SOFTWARE\Microsoft\Office\14.0'
-    )
+    $statusText = @{ 0 = 'Unlicensed'; 1 = 'Licensed'; 2 = 'Out-of-box grace'; 3 = 'Out-of-tolerance grace'; 4 = 'Non-genuine grace'; 5 = 'Notification'; 6 = 'Extended grace' }
+    $windows = @(Get-CimInstance SoftwareLicensingProduct -Filter "ApplicationID='55c92734-d682-4d71-983e-d6ec3f16059f' AND PartialProductKey IS NOT NULL" -ErrorAction SilentlyContinue)
+    foreach ($w in $windows) {
+        Write-Check $(if ($w.LicenseStatus -eq 1) { 'OK' } else { 'WARN' }) 'Edition' "$($w.Name) - $($statusText[[int]$w.LicenseStatus])"
+        Write-Check 'INFO' 'Installed key (last 5)' "XXXXX-XXXXX-XXXXX-XXXXX-$($w.PartialProductKey)"
+        Write-Check 'INFO' 'Channel' "$($w.ProductKeyChannel)"
+    }
+    if (-not $windows.Count) { Write-Check 'INFO' 'Licensing' 'No licensed Windows product reported' }
 
-    foreach ($path in $officeVersions) {
-        if (Test-Path $path) {
-            Get-ChildItem -Path $path | ForEach-Object {
-                $name = $_.PSChildName
-                $version = if ($name -like '16.*') { 'Office 2016/2019' } elseif ($name -like '15.*') { 'Office 2013' } else { "Version $name" }
-                Write-Check 'INFO' $version $name
-            }
+    # The full key is only retrievable when the OEM embedded it in the firmware. A key
+    # entered by hand, or a digital licence, is not stored anywhere readable.
+    $oem = (Get-CimInstance SoftwareLicensingService -ErrorAction SilentlyContinue).OA3xOriginalProductKey
+    if ($oem) { Write-Check 'OK' 'OEM key in firmware' $oem }
+    else { Write-Check 'INFO' 'OEM key in firmware' 'None - this PC has a digital licence or a manually entered key, which Windows does not store in readable form' }
+
+    Write-Section 'Office'
+    $office = @(Get-CimInstance SoftwareLicensingProduct -Filter "PartialProductKey IS NOT NULL" -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -like '*Office*' -or $_.Name -like '*Project*' -or $_.Name -like '*Visio*' })
+    if ($office.Count) {
+        foreach ($o in $office) {
+            Write-Check $(if ($o.LicenseStatus -eq 1) { 'OK' } else { 'WARN' }) $o.Name "$($statusText[[int]$o.LicenseStatus]), key ends $($o.PartialProductKey), channel $($o.ProductKeyChannel)"
         }
+    } else {
+        Write-Check 'INFO' 'Office licensing' 'No key-based Office licence found. Microsoft 365 subscriptions sign in instead of using a product key (APP-04 shows the install details).'
     }
 
     Write-Host ''
-    Write-Info 'Note: Keys stored in registry may not be in standard format. For detailed information, use third-party key recovery tools or contact Microsoft Support.'
+    Write-Info 'Only the last five characters of an installed key are recoverable, plus the full OEM key when the manufacturer embedded one in the firmware.'
 }

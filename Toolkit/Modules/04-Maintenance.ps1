@@ -330,10 +330,14 @@ Add-Tool -Id 'MNT-29' -Category 'Maintenance & Repair' -Name 'System restore poi
 
     Write-Info "Creating System Restore point: $name"
     try {
-        Checkpoint-Computer -Description $name -RestorePointType 'Manual' -ErrorAction Stop
+        # 'Manual' is not one of the accepted values (APPLICATION_INSTALL,
+        # APPLICATION_UNINSTALL, DEVICE_DRIVER_INSTALL, MODIFY_SETTINGS,
+        # CANCELLED_OPERATION), so every run used to fail on parameter validation.
+        Checkpoint-Computer -Description $name -RestorePointType MODIFY_SETTINGS -ErrorAction Stop
         Write-Ok "Restore point created successfully"
     } catch {
         Write-Err "Failed to create restore point: $($_.Exception.Message)"
+        Write-Info 'System Protection may be off for this drive, or a restore point was already made in the last 24 hours (Windows allows one per day).'
     }
 }
 
@@ -393,29 +397,34 @@ Add-Tool -Id 'MNT-32' -Category 'Maintenance & Repair' -Name 'Unblock Windows St
 Add-Tool -Id 'MNT-34' -Category 'Maintenance & Repair' -Name 'Fix Outlook password prompt' -Description 'Disable credentials caching to resolve Outlook password prompt disappearing issues' -Admin -Action {
     Write-Info 'Configuring Outlook password behavior...'
 
-    $registryPaths = @(
-        'HKCU:\Software\Microsoft\Office\*\Outlook\Security',
-        'HKLM:\Software\Microsoft\Office\*\Outlook\Security'
-    )
-
+    # This used to call Get-ChildItem on ...\Outlook\Security, which lists that key's
+    # SUBKEYS - normally none - so the list was always empty and the tool always reported
+    # "Could not locate Outlook registry settings". It also hard-coded 16.0, which made
+    # the wildcard in the path list pointless. Enumerate the Office version keys instead.
     $modified = $false
-    foreach ($regPath in $registryPaths) {
-        $actualPaths = Get-ChildItem -Path ($regPath -replace '\*', '16.0') -ErrorAction SilentlyContinue | Select-Object -ExpandProperty PSPath
-
-        foreach ($path in $actualPaths) {
+    foreach ($root in 'HKCU:\Software\Microsoft\Office', 'HKLM:\Software\Microsoft\Office') {
+        $scope = if ($root -like 'HKCU:*') { 'current user' } else { 'all users' }
+        foreach ($ver in @(Get-ChildItem -Path $root -ErrorAction SilentlyContinue | Where-Object { $_.PSChildName -match '^\d+\.\d+$' })) {
+            $path = Join-Path $ver.PSPath 'Outlook\Security'
+            if (-not (Test-Path -LiteralPath $path)) {
+                try { $path = (New-Item -Path $path -Force -ErrorAction Stop).PSPath }
+                catch { Write-Warn "Could not create the Security key for Office $($ver.PSChildName) ($scope): $($_.Exception.Message)"; continue }
+            }
             try {
-                Set-ItemProperty -Path $path -Name 'PromptSimplePassword' -Value 1 -ErrorAction SilentlyContinue
+                Set-ItemProperty -LiteralPath $path -Name 'PromptSimplePassword' -Value 1 -Type DWord -ErrorAction Stop
+                Write-Ok "Office $($ver.PSChildName) ($scope): PromptSimplePassword set."
                 $modified = $true
-            } catch { Write-Warn "Could not modify $path : $($_.Exception.Message)" }
+            } catch { Write-Warn "Could not modify Office $($ver.PSChildName) ($scope): $($_.Exception.Message)" }
         }
     }
 
     if ($modified) {
         Write-Ok 'Outlook password prompt settings configured.'
         Write-Info 'You may need to restart Outlook for changes to take effect.'
+        Write-Info 'If the prompts continue, clear the cached Office credentials with APP-10.'
         Write-Log 'Outlook password prompt settings modified'
     } else {
-        Write-Warn 'Could not locate Outlook registry settings. Outlook may not be installed.'
+        Write-Warn 'No Office installation was found in the registry. Outlook may not be installed.'
     }
 }
 
@@ -423,6 +432,10 @@ Add-Tool -Id 'MNT-26' -Category 'Maintenance & Repair' -Name 'Remove bloatware a
     # Merged from MNT-33 "Remove Appx packages", which is mode 2 below. The two did the same
     # Get-AppxPackage / Remove-AppxPackage work from opposite ends: a curated list vs. all.
     Write-Section 'Remove Bloatware and Store Apps'
+    # PowerShell 7 has no in-process Appx cmdlets; without this the tool fails with
+    # "Get-AppxPackage is not recognized" (APP-12 does the same).
+    if ($PSVersionTable.PSEdition -eq 'Core') { Import-Module Appx -UseWindowsPowerShell -WarningAction SilentlyContinue -ErrorAction SilentlyContinue }
+    if (-not (Get-Command Get-AppxPackage -ErrorAction SilentlyContinue)) { Write-Err 'The Appx cmdlets are not available on this system.'; return }
     Write-Host '  [1] Common bloatware - pick several from a known list'
     Write-Host '  [2] Any installed Store app - pick one from everything installed'
     $mode = Read-Host '  Choice'
@@ -485,8 +498,11 @@ Add-Tool -Id 'MNT-26' -Category 'Maintenance & Repair' -Name 'Remove bloatware a
     Write-Host ''
     $removable = @()
     foreach ($app in $bloatwareApps) {
-        $match = $installed | Where-Object { $_ -like "$($app[0])*" }
-        if ($match) {
+        # @() because a prefix can match several packages; PackageName used to hold an
+        # array, which Get-AppxPackage -Name then flattened to one space-joined string
+        # and matched nothing, so the removal silently "failed" every time.
+        $match = @($installed | Where-Object { $_ -like "$($app[0])*" })
+        if ($match.Count) {
             $removable += [pscustomobject]@{ PackageName = $match; DisplayName = $app[1] }
             Write-Host "  [$($removable.Count)] $($app[1])"
         }
@@ -507,12 +523,12 @@ Add-Tool -Id 'MNT-26' -Category 'Maintenance & Repair' -Name 'Remove bloatware a
     if ($choice -eq 'all') {
         $toRemove = $removable
     } else {
-        $numbers = $choice -split ',' | ForEach-Object { [int]$_.Trim() - 1 }
-        foreach ($n in $numbers) {
-            if ($n -ge 0 -and $n -lt $removable.Count) {
-                $toRemove += $removable[$n]
-            }
-        }
+        # Validate before casting: [int]'abc' threw an unhandled conversion error, and a
+        # trailing comma ("1,3,") was enough to trigger it
+        $parts = @($choice -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+        $bad = @($parts | Where-Object { $_ -notmatch '^\d+$' -or [int]$_ -lt 1 -or [int]$_ -gt $removable.Count })
+        if ($bad.Count) { Write-Err ("Not a number between 1 and $($removable.Count): " + ($bad -join ', ')); return }
+        foreach ($n in $parts) { $toRemove += $removable[[int]$n - 1] }
     }
 
     if ($toRemove.Count -eq 0) { Write-Info 'No valid selections.'; return }
@@ -523,13 +539,15 @@ Add-Tool -Id 'MNT-26' -Category 'Maintenance & Repair' -Name 'Remove bloatware a
     $failed = 0
 
     foreach ($app in $toRemove) {
-        try {
-            Get-AppxPackage -Name $app.PackageName -ErrorAction Stop | Remove-AppxPackage -ErrorAction Stop
-            Write-Ok "Removed: $($app.DisplayName)"
-            $removed++
-        } catch {
-            Write-Warn "Failed to remove $($app.DisplayName): $($_.Exception.Message)"
-            $failed++
+        foreach ($pkg in @($app.PackageName)) {
+            try {
+                Get-AppxPackage -Name $pkg -ErrorAction Stop | Remove-AppxPackage -ErrorAction Stop
+                Write-Ok "Removed: $($app.DisplayName) ($pkg)"
+                $removed++
+            } catch {
+                Write-Warn "Failed to remove $($app.DisplayName) ($pkg): $($_.Exception.Message)"
+                $failed++
+            }
         }
     }
 
