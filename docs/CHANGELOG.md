@@ -8,6 +8,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+
+**Stand alone scripts\Input-and-Hardware-Diagnostics.ps1**
+- **The feed's Modifiers column was always empty.** `Write-Feed` set `$mods` to an empty
+  string and never assigned it, and the poll loop never passed the modifier state it had
+  in hand, so a column 80 px wide showed nothing on every row.
+- **The hook queue was drained without a cap.** With the trackpad window open every mouse
+  movement is queued, and each event costs a timestamp, a feed row and several control
+  updates, so one fast swipe could hand a single 25 ms tick thousands of events and stall
+  the UI thread. The drain now takes at most 400 per tick (16,000 a second) and leaves the
+  rest for the next one. The touchscreen window's pointer drain is capped the same way.
+- **Three windows redrew constantly while idle.** The touchscreen grid was invalidated and
+  its two header buttons repositioned 40 times a second whether or not any touch had
+  arrived; the trackpad canvas was invalidated on every single movement event, each repaint
+  redrawing up to 1,800 path points; and the controller view replaced its whole text box 20
+  times a second, resetting the caret and scroll position while it was being read. Each now
+  updates only when something changed, with the trackpad repainting at about 30 fps.
+- **Session statistics recalculated on an empty queue**, walking every key statistic and
+  the whole 60-second keypress window 40 times a second with nothing to show.
+- **The mouse button labels always read "(0)" outside Test Mode**, because the click
+  counters are a Test Mode metric but the labels appended them regardless, while the feed
+  listed the clicks. The count now appears only while it is being collected.
+- A key held when capture stopped kept its "down" flag in the key inspector.
+- Key fades landed on the plain key colour, so a modifier, function or navigation key faded
+  to the wrong colour and then snapped to its own idle colour at the end.
+- Event timestamps used the current culture's time separator, reading as "14.05.03.123"
+  wherever that separator is not a colon.
+- The privacy notes now say that the foreground program's name and window title are shown
+  in the "Active app" line - on screen only, never saved - and that input typed into a
+  program running as Administrator cannot be seen, because the tool deliberately runs
+  unelevated.
+
+**GUI**
 - **Favorites were silently capped at six.** Starring a seventh tool was refused with a
   message about Quick Access being full - the row of buttons at the top, which holds six -
   even though Favorites is a category of its own with its own search. Starring is now
